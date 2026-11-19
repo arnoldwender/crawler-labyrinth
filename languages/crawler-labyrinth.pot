@@ -1,0 +1,317 @@
+# Copyright (C) 2026 Arnold Wender
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Crawler Labyrinth 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/crawler-labyrinth\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-11-19T11:45:59+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: crawler-labyrinth\n"
+
+#. Plugin Name of the plugin
+#: crawler-labyrinth.php
+#: includes/Admin/AdminDashboard.php:174
+#: includes/Admin/AdminDashboard.php:175
+#: includes/Admin/AdminDashboard.php:351
+msgid "Crawler Labyrinth"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: crawler-labyrinth.php
+msgid "https://github.com/arnoldwender/crawler-labyrinth"
+msgstr ""
+
+#. Description of the plugin
+#: crawler-labyrinth.php
+msgid "Local deterministic crawler tarpit and RFC 9309 robots.txt honeypot with hybrid HTTP 429/403 quarantine, HMAC-chained audit logging, and privacy-preserving daily IP digests."
+msgstr ""
+
+#. Author of the plugin
+#: crawler-labyrinth.php
+msgid "Arnold Wender"
+msgstr ""
+
+#. Author URI of the plugin
+#: crawler-labyrinth.php
+msgid "https://arnoldwender.com"
+msgstr ""
+
+#: crawler-labyrinth.php:57
+msgid "Crawler Labyrinth requires PHP 8.2 or higher."
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:205
+msgid "Crawler Labyrinth — Honeypot & Telemetry"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:220
+msgid "Crawler Labyrinth Active"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:220
+msgid "Crawler Labyrinth Paused"
+msgstr ""
+
+#. translators: 1: mode name, 2: route prefix
+#: includes/Admin/AdminDashboard.php:227
+#, php-format
+msgid "Mode: %1$s | Trap: /%2$s/"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:239
+msgid "Trap Hits"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:243
+msgid "Quarantined"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:250
+msgid "Open Crawler Labyrinth"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:324
+msgid "Telemetry & Audit"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:328
+msgid "Trap Settings"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:332
+msgid "Decoy & robots.txt Preview"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:336
+msgid "Privacy, REST & WP-CLI"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:352
+msgid "Local deterministic crawler tarpit &bull; RFC 9309 trap &bull; Keyed HMAC audit chain"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:358
+msgid "HMAC CHAIN VALID"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:358
+msgid "HMAC CHAIN WARNING"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:365
+msgid "Settings and schedule updated."
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:369
+msgid "Crawler Labyrinth Navigation"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:382
+msgid "Honeypot Status"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:383
+msgid "Active"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:383
+msgid "Paused"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:387
+msgid "Decoy Pages Served"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:389
+msgid "100% local generation"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:392
+msgid "Quarantined Requests"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:397
+msgid "Unique IP Digests"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:399
+msgid "verified rows"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:404
+msgid "Recent Crawler Trap Activity"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:406
+msgid "No trap hits have been recorded yet."
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:412
+msgid "ID"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:413
+msgid "Timestamp (UTC)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:414
+msgid "Action"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:415
+msgid "IP Digest"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:416
+msgid "Route Token"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:417
+msgid "User-Agent Excerpt"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:440
+msgid "Run Pseudonymizing Retention Now"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:446
+msgid "Data Lifecycle &amp; Uninstall"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:451
+msgid "Data Lifecycle Options"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:455
+msgid "Delete plugin options and audit log table on uninstall"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:455
+msgid "By default all settings and the HMAC-chained hit log survive plugin deletion."
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:460
+msgid "Save Lifecycle Preference"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:469
+msgid "Crawler Labyrinth &amp; Quarantine Configuration"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:475
+msgid "Activation &amp; Routing"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:479
+msgid "Enable Crawler Labyrinth honeypot and trap routing"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:485
+msgid "Inject Disallow rule across all RFC 9309 User-agent groups in robots.txt"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:491
+msgid "Opt-in: also trap known AI training scraper User-Agents (spares search and citation bots)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:495
+msgid "Trap Route Prefix (lowercase alphanumeric and hyphens, 3-32 chars)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:501
+msgid "Defense Mode &amp; Quarantine Limits"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:503
+msgid "Trap Mode"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:505
+msgid "Hybrid (serve decoy up to strike threshold, then quarantine)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:506
+msgid "Labyrinth Only (always serve bounded synthetic decoys)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:507
+msgid "Immediate Block (quarantine on first disallowed hit)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:511
+msgid "Decoy Response Format"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:513
+msgid "Semantic HTML5 (interlinked archival folios)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:514
+msgid "Plain Text (minimal bandwidth)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:519
+msgid "Footer Bait Links per Page (1-5)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:523
+msgid "Max Labyrinth Ring Depth (1-16)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:527
+msgid "Hybrid Strike Threshold (1-100)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:531
+msgid "Quarantine TTL in Minutes (5-10080)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:535
+msgid "Quarantine HTTP Status Code"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:537
+msgid "429 Too Many Requests (with Retry-After)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:538
+msgid "403 Forbidden"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:542
+msgid "User-Agent Retention Days (0 = keep, 1-365)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:549
+msgid "Save Labyrinth Settings"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:572
+msgid "Sample Synthetic Archival Entry"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:576
+msgid "RFC 9309 robots.txt Group Injection Preview"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:584
+msgid "Privacy, REST API &amp; WP-CLI Reference"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:586
+msgid "All decoy generation is 100% local with zero outbound proxy calls. Visitor IP addresses are hashed with a daily rotating HMAC-SHA256 key and never stored in plaintext. Scheduled retention pseudonymizes User-Agent excerpts while preserving hash-chain verification."
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:588
+msgid "WP-CLI Commands"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:593
+msgid "REST API Endpoints (manage_options required)"
+msgstr ""

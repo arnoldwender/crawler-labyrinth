@@ -1,0 +1,12 @@
+.git
+.gitignore
+.distignore
+.github
+tests
+docs
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+bom.json
