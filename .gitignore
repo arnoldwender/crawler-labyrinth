@@ -21,3 +21,7 @@ GEMINI.md
 # Build & test caches
 /dist/
 /.phpunit.result.cache
+
+# Preserve plugin assets on case-insensitive filesystems
+!/assets/
+!/assets/**
