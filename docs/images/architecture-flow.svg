@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 420" width="1080" height="420" role="img" aria-labelledby="cl-arch-title cl-arch-desc">
+  <title id="cl-arch-title">Crawler Labyrinth Request Routing and Audit Architecture</title>
+  <desc id="cl-arch-desc">Flow diagram showing compliant search crawlers serving public WordPress pages via RFC 9309 multi-group robots.txt while non-compliant scrapers entering inert footer bait are trapped into local deterministic decoys, escalated to HTTP 429 quarantine, and logged to a keyed HMAC chain.</desc>
+  <defs>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#3fb950" />
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f85149" />
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#d29922" />
+    </marker>
+  </defs>
+
+  <rect width="1080" height="420" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1.5" />
+
+  <text x="36" y="42" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="700">Crawler Labyrinth — WordPress Architecture</text>
+  <text x="36" y="64" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5">Local deterministic tarpit · RFC 9309 multi-group Disallow · Keyed daily HMAC digests &amp; hash-chained audit table</text>
+
+  <!-- Row 1: Compliant Search & Citation Bots -->
+  <rect x="36" y="96" width="230" height="88" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+  <text x="54" y="124" fill="#3fb950" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">Search &amp; Citation Crawlers</text>
+  <text x="54" y="145" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">Googlebot, OAI-SearchBot,</text>
+  <text x="54" y="163" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">Claude-SearchBot, PerplexityBot</text>
+
+  <line x1="266" y1="140" x2="340" y2="140" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow-green)" />
+
+  <rect x="344" y="96" width="310" height="88" rx="10" fill="#161b22" stroke="#2ea043" stroke-width="1.5" />
+  <text x="362" y="124" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">RobotsInjector (RFC 9309)</text>
+  <text x="362" y="145" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">Injects Disallow: /crawler-trap/ into</text>
+  <text x="362" y="163" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">every User-agent: group (zero shadowing)</text>
+
+  <line x1="654" y1="140" x2="728" y2="140" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow-green)" />
+
+  <rect x="732" y="96" width="312" height="88" rx="10" fill="#161b22" stroke="#2ea043" stroke-width="1.5" />
+  <text x="750" y="124" fill="#3fb950" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">200 Public Site &amp; Indexing Intact</text>
+  <text x="750" y="145" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">Footer bait uses hidden + aria-hidden=&quot;true&quot;</text>
+  <text x="750" y="163" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">Keyboard focus &amp; screen readers unaffected</text>
+
+  <!-- Row 2: Non-Compliant Scrapers -> TrapRouter -> DecoyGenerator / Quarantine -> HitLogger -->
+  <rect x="36" y="218" width="230" height="106" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+  <text x="54" y="246" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">Non-Compliant Scrapers</text>
+  <text x="54" y="267" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">Ignore Disallow &amp; follow signed</text>
+  <text x="54" y="284" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">/crawler-trap/&lt;d-seed-sig&gt;/</text>
+  <text x="54" y="303" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">(or opt-in training UA match)</text>
+
+  <line x1="266" y1="271" x2="310" y2="271" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow-cyan)" />
+
+  <rect x="314" y="218" width="214" height="106" rx="10" fill="#161b22" stroke="#38bdf8" stroke-width="1.5" />
+  <text x="332" y="246" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">TrapRouter &amp; Signer</text>
+  <text x="332" y="267" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">Constant-time hash_equals()</text>
+  <text x="332" y="285" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">Spares admins &amp; wp-admin</text>
+  <text x="332" y="303" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11">keyed daily IP digest</text>
+
+  <!-- Split arrows from TrapRouter -->
+  <line x1="528" y1="248" x2="572" y2="238" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow-cyan)" />
+  <line x1="528" y1="292" x2="572" y2="302" stroke="#f85149" stroke-width="2" marker-end="url(#arrow-red)" />
+
+  <rect x="576" y="204" width="244" height="62" rx="10" fill="#161b22" stroke="#38bdf8" stroke-width="1.5" />
+  <text x="592" y="227" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700">Strikes 1..N · DecoyGenerator</text>
+  <text x="592" y="247" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">200 deterministic ring + noindex/noai</text>
+
+  <rect x="576" y="276" width="244" height="62" rx="10" fill="#161b22" stroke="#f85149" stroke-width="1.5" />
+  <text x="592" y="299" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700">Strike N+1 · Quarantine</text>
+  <text x="592" y="319" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">HTTP 429 + Retry-After (or 403)</text>
+
+  <!-- Arrows into HitLogger -->
+  <line x1="820" y1="238" x2="848" y2="255" stroke="#d29922" stroke-width="1.8" marker-end="url(#arrow-amber)" />
+  <line x1="820" y1="305" x2="848" y2="288" stroke="#d29922" stroke-width="1.8" marker-end="url(#arrow-amber)" />
+
+  <rect x="852" y="218" width="192" height="106" rx="10" fill="#161b22" stroke="#d29922" stroke-width="1.5" />
+  <text x="868" y="246" fill="#d29922" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">HitLogger Chain</text>
+  <text x="868" y="267" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">prev_hash -> row_hash</text>
+  <text x="868" y="285" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Daily retention cron</text>
+  <text x="868" y="303" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Verify via REST / WP-CLI</text>
+
+  <!-- Footer bar -->
+  <rect x="36" y="358" width="1008" height="38" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1" />
+  <text x="54" y="382" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">Zero external HTTP proxy calls · Zero plaintext IP storage · REST /wp-json/crawler-labyrinth/v1 · WP-CLI wp crawler-labyrinth</text>
+</svg>
