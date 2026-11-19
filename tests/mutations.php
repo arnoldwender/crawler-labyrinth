@@ -238,4 +238,10 @@ return [
 			[ 'includes/Core/Settings.php', 'if ( strlen( $clean ) < 3 || strlen( $clean ) > 32 ) {', 'if ( strlen( $clean ) < 3 ) {' ],
 		],
 	],
+	[
+		'RobotsInjector lowercases directive path value violating RFC 9309 path case sensitivity',
+		[
+			[ 'includes/Core/RobotsInjector.php', '$value = trim( substr( $directive, $colon_pos + 1 ) );', '$value = strtolower( trim( substr( $directive, $colon_pos + 1 ) ) );' ],
+		],
+	],
 ];
