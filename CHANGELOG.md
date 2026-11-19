@@ -4,6 +4,11 @@ All notable changes to **Crawler Labyrinth** are documented in this file followi
 
 ---
 
+## [1.0.1] - 2026-11-19
+
+### Changed
+- Added explicit zero-support, GitHub-Issues-only bug reporting, no-private-support, and no-warranty / zero-liability ("AS IS") terms in `SUPPORT.md`, `README.md`, `readme.txt`, `SECURITY.md`, `CONTRIBUTING.md`, and GitHub issue templates.
+
 ## [1.0.0] - 2026-11-19
 
 ### Added
