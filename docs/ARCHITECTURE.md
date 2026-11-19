@@ -2,6 +2,10 @@
 
 `crawler-labyrinth` · Version `1.0.0` · WordPress 6.4+ · PHP 8.2+ · Text Domain `crawler-labyrinth`
 
+<p align="center">
+  <img src="images/architecture-flow.svg" alt="Crawler Labyrinth WordPress runtime request routing and audit architecture" />
+</p>
+
 ---
 
 ## 1. Runtime Request Flow
