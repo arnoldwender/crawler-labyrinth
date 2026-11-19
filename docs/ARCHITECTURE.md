@@ -1,6 +1,6 @@
 # Architecture — Crawler Labyrinth
 
-`crawler-labyrinth` · Version `1.0.1` · WordPress 6.4+ · PHP 8.2+ · Text Domain `crawler-labyrinth`
+`crawler-labyrinth` · Version `1.0.2` · WordPress 6.4+ · PHP 8.2+ · Text Domain `crawler-labyrinth`
 
 <p align="center">
   <img src="images/architecture-flow.svg" alt="Crawler Labyrinth WordPress runtime request routing and audit architecture" />

@@ -4,7 +4,7 @@ Tags: security, robots, honeypot, crawler, tarpit
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -53,6 +53,11 @@ No. This plugin is provided with zero support (`0` support). Private inquiries v
 3. Decoy & robots.txt Preview tab inspecting generated synthetic HTML5 entries and multi-group Disallow injection.
 
 == Changelog ==
+
+= 1.0.2 =
+* Security and request routing: hardened subdirectory (`base_path`) normalization and segment-bounded route exclusions, switched to `wp_parse_url()`, enforced remote IP parsing without trusting spoofable forwarding headers by default, bounded verified trap depth (`<= 16`), added HTTP `HEAD` empty-body responses, removed `Retry-After` from `403` responses, and cleared object-cache `notoptions` entries on concurrent HMAC secret initialization.
+* Audit log and retention: added MySQL `GET_LOCK`/`RELEASE_LOCK` append serialization, keyset-paginated `verify_chain()` with strict `prev_hash` linkage validation, multi-batch `purge_expired()`, `[REDACTED]` User-Agent spoof filtering, and UTF-8 `mb_substr()` truncation matching `VARCHAR(191)`.
+* Compatibility and accessibility: fixed `RobotsInjector` RFC 9309 case-sensitive path matching, `#` comment ordering before blank lines, lowercase/empty seed canonicalization parity, `.cl-admin .cl-input` border contrast (`#64748b`), `44px` touch targets, `320px` reflow guards, `forced-colors` active tab highlight, safe `?tab=` fallback clamping, and expanded standalone tests (54 passing) plus 39 mutation checks.
 
 = 1.0.1 =
 * Explicit zero-support, GitHub-only bug reporting, no-private-support, and no-warranty / zero-liability ("AS IS") notices added to `SUPPORT.md`, `README.md`, `readme.txt`, `SECURITY.md`, `CONTRIBUTING.md`, and GitHub issue templates.
