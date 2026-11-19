@@ -1,0 +1,23 @@
+# Dependencies & Composer / Node caches
+vendor/
+node_modules/
+
+# Environment & local secrets
+.env
+.env.*
+!.env.example
+
+# Local editor, OS, and assistant scratch files
+.DS_Store
+.vscode/
+.idea/
+*.log
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.claude/
+.gemini/
+
+# Build & test caches
+/dist/
+/.phpunit.result.cache
