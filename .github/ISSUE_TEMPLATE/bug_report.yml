@@ -3,6 +3,10 @@ description: Report a defect in Crawler Labyrinth
 title: "[Bug]: "
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Zero Support Policy:** This repository carries **zero technical or private support** ([SUPPORT.md](../../SUPPORT.md)). Use GitHub Issues **only** for reproducible defects in the code, with no guaranteed reply or fix. **Do not** contact the author privately. Software is provided **"AS IS"** at your sole risk with zero liability.
   - type: textarea
     id: summary
     attributes:
