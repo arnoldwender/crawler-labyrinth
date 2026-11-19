@@ -93,7 +93,7 @@ final class RobotsInjector {
 				}
 			} elseif ( $in_group && $is_blank ) {
 				if ( ! $group_has_disallow ) {
-					$result[] = $rule;
+					$result = self::insert_before_trailing_blanks( $result, $rule );
 				}
 				$in_group             = false;
 				$has_non_ua_directive = false;

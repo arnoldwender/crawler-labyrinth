@@ -302,11 +302,23 @@ if ( ! function_exists( 'do_action' ) ) {
 }
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( string $option, mixed $default = false ): mixed {
-		global $mock_options, $mock_current_blog_id, $mock_blog_options;
+		global $mock_options, $mock_current_blog_id, $mock_blog_options, $mock_notoptions_poisoned;
+		if ( ! empty( $mock_notoptions_poisoned ) && 'crawler_labyrinth_hmac_secret' === $option ) {
+			return $default;
+		}
 		if ( 1 !== ( $mock_current_blog_id ?? 1 ) ) {
 			return $mock_blog_options[ $mock_current_blog_id ][ $option ] ?? $default;
 		}
 		return $mock_options[ $option ] ?? $default;
+	}
+}
+if ( ! function_exists( 'wp_cache_delete' ) ) {
+	function wp_cache_delete( string $key, string $group = '' ): bool {
+		global $mock_notoptions_poisoned;
+		if ( 'notoptions' === $key && 'options' === $group ) {
+			$mock_notoptions_poisoned = false;
+		}
+		return true;
 	}
 }
 if ( ! function_exists( 'get_site_option' ) ) {
@@ -318,7 +330,12 @@ if ( ! function_exists( 'get_site_option' ) ) {
 if ( ! function_exists( 'add_option' ) ) {
 	function add_option( string $option, mixed $value = '', string $deprecated = '', mixed $autoload = null ): bool {
 		unset( $deprecated, $autoload );
-		global $mock_options, $mock_current_blog_id, $mock_blog_options;
+		global $mock_options, $mock_current_blog_id, $mock_blog_options, $mock_simulate_race_secret;
+		if ( 'crawler_labyrinth_hmac_secret' === $option && ! empty( $mock_simulate_race_secret ) ) {
+			$mock_options[ $option ]   = (string) $mock_simulate_race_secret;
+			$mock_simulate_race_secret = '';
+			return false;
+		}
 		if ( 1 !== ( $mock_current_blog_id ?? 1 ) ) {
 			if ( array_key_exists( $option, $mock_blog_options[ $mock_current_blog_id ] ?? [] ) ) {
 				return false;
@@ -1351,6 +1368,116 @@ assert_test(
 		&& [] === ( $mock_blog_options[2] ?? [] )
 		&& true === ( $wpdb->tables_dropped['wp_2_crawler_labyrinth_hits'] ?? false )
 		&& ! isset( $wpdb->tables_dropped['wp_crawler_labyrinth_hits'] )
+);
+
+// Group 12: Round 2 parity, cache-race, UTF-8 truncation, fallback routing & all extra mutant guards
+echo "\nGroup 12: Cache race, UTF-8 truncation, unknown tab clamp, and strict invariant pins\n";
+
+// 1. TokenSigner::ensure_secret notoptions cache race + client_ip ignores XFF + verify depth bounds + uppercase seed & mapped IPv6 parity
+unset( $mock_options[ TokenSigner::SECRET_OPTION ] );
+$mock_notoptions_poisoned   = true;
+$mock_simulate_race_secret  = str_repeat( 'e', 64 );
+$resolved_race_secret       = TokenSigner::ensure_secret();
+$mock_notoptions_poisoned   = false;
+$mock_simulate_race_secret  = '';
+$mock_options[ TokenSigner::SECRET_OPTION ] = $secret;
+$_SERVER['REMOTE_ADDR']          = '192.0.2.10';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.99';
+$client_ip_out                   = TokenSigner::client_ip();
+unset( $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_FORWARDED_FOR'] );
+$depth17_mac = substr( hash_hmac( 'sha256', '17|seedalpha1', $secret ), 0, 16 );
+$tok_depth17 = '17-seedalpha1-' . $depth17_mac;
+assert_test(
+	'TokenSigner clears notoptions cache on add_option race, ignores X-Forwarded-For, bounds depth 1..16, and aligns uppercase seed & mapped IPv6 parity',
+	str_repeat( 'e', 64 ) === $resolved_race_secret
+		&& '192.0.2.10' === $client_ip_out
+		&& null === TokenSigner::verify( $tok_depth17, $secret )
+		&& str_starts_with( TokenSigner::sign( 2, 'SeedAlpha9', $secret ), '2-seedalpha9-' )
+		&& 'seedalpha9' === $gen->generate( 2, 'SeedAlpha9', 'html', 'crawler-trap', 4, 2, $secret )['seed']
+		&& '198.51.100.7' === TokenSigner::normalize_ip( '0:0:0:0:0:ffff:198.51.100.7' )
+		&& '198.51.100.7' === TokenSigner::normalize_ip( '::ffff:c633:6407' )
+		&& 'fe80::1' === TokenSigner::normalize_ip( '[fe80::1%eth0]:443' )
+		&& 'crawler-trap' === Settings::sanitize_route_prefix( str_repeat( 'a', 33 ) )
+		&& false === ( $preview_args['depth']['validate_callback'] )( "12\n" )
+);
+
+// 2. RobotsInjector places Disallow above trailing # comments before blank lines (matching TS patchRobotsTxt)
+$robots_comment_blank = RobotsInjector::inject( "User-agent: Foo\nAllow: /\n# trailing note\n\nUser-agent: *\nAllow: /\n", 'crawler-trap' );
+assert_test(
+	'RobotsInjector inserts Disallow above trailing # comments before blank lines',
+	str_contains( $robots_comment_blank, "Allow: /\nDisallow: /crawler-trap/\n# trailing note\n" ),
+	$robots_comment_blank
+);
+
+// 3. TrapRouter kill switch, active_quarantine_max persistence, and d >= 2..7 lookback rollover
+$mock_transients = [];
+$mock_options['crawler_labyrinth_enabled']               = '0';
+$mock_options['crawler_labyrinth_active_quarantine_max'] = 0;
+$disabled_hit = $router->handle_request( '/crawler-trap/1-seedalpha1-0000/', 'GPTBot/1.2', '198.51.100.12', false );
+$mock_options['crawler_labyrinth_enabled']               = '1';
+$mock_options['crawler_labyrinth_mode']                  = 'block';
+$mock_options['crawler_labyrinth_block_ttl_minutes']     = 10080;
+$mock_options['crawler_labyrinth_block_status']          = 403;
+$block_max_hit = $router->handle_request( '/crawler-trap/1-seedalpha1-0000/', 'BadBot/1.0', '198.51.100.13', false );
+$d3_digest     = TokenSigner::ip_digest( '198.51.100.14', gmdate( 'Y-m-d', time() - ( 3 * 86400 ) ), $secret );
+$mock_transients[ 'crawler_labyrinth_q_' . substr( $d3_digest, 0, 24 ) ] = [ 'until' => time() + 3600, 'strikes' => 4 ];
+$d3_hit        = $router->handle_request( '/ordinary/', 'Rollover3/1.0', '198.51.100.14', false );
+assert_test(
+	'TrapRouter respects enabled kill switch, persists active_quarantine_max, and checks d=3 lookback within 7-day TTL',
+	false === $disabled_hit['handled']
+		&& true === $block_max_hit['handled']
+		&& (int) ( $mock_options['crawler_labyrinth_active_quarantine_max'] ?? 0 ) > time()
+		&& true === $d3_hit['handled']
+		&& 403 === $d3_hit['status']
+);
+
+// 4. HitLogger REDACTED_MARKER spoof guard, UTF-8 mb_substr truncation, and purge_expired skipping tampered rows
+$wpdb->rows      = [];
+$wpdb->insert_id = 0;
+$spoof_id        = $logger->record( $d1, $d2, HitLogger::REDACTED_MARKER, '1-spoof', 'decoy_served', '{}', $batch_old );
+$spoof_before    = $wpdb->rows[ $spoof_id ]->user_agent_excerpt;
+$utf8_ua         = str_repeat( 'a', 190 ) . '🦊trailing';
+$utf8_id         = $logger->record( $d1, $d2, $utf8_ua, '1-utf8', 'decoy_served', '{}', $new_date );
+$tamper_old_id   = $logger->record( $d1, $d2, 'TamperBot/1', '1-tamper', 'decoy_served', '{}', $batch_old );
+$wpdb->rows[ $tamper_old_id ]->route_token = 'tampered-before-purge';
+$tamper_skip_res = $logger->purge_expired( false, 30 );
+$utf8_chain      = $logger->verify_chain();
+assert_test(
+	'HitLogger filters literal [REDACTED] UA spoofs, truncates UTF-8 cleanly via mb_substr, and skips tampered rows during purge_expired',
+	'(filtered)' === $spoof_before
+		&& mb_check_encoding( $wpdb->rows[ $utf8_id ]->user_agent_excerpt, 'UTF-8' )
+		&& 191 === mb_strlen( $wpdb->rows[ $utf8_id ]->user_agent_excerpt, 'UTF-8' )
+		&& HitLogger::REDACTED_MARKER === $wpdb->rows[ $spoof_id ]->user_agent_excerpt
+		&& 'TamperBot/1' === $wpdb->rows[ $tamper_old_id ]->user_agent_excerpt
+		&& false === $utf8_chain['valid']
+		&& $tamper_old_id === $utf8_chain['broken_at_id']
+);
+
+// 5. AdminDashboard purge_now form POST + ?tab=unknown_tab fallback renders chain badge & rows
+$wpdb->rows      = [];
+$wpdb->insert_id = 0;
+$logger->record( $d1, $d2, 'PurgePostBot/1', '1-ppost', 'decoy_served', '{}', $batch_old );
+$_POST = [
+	'crawler_labyrinth_purge_nonce' => 'valid-nonce-crawler_labyrinth_save_action',
+	'crawler_labyrinth_form'        => 'purge_now',
+];
+try {
+	AdminDashboard::instance()->save_settings();
+} catch ( Crawler_Labyrinth_Test_Redirect $e ) {
+	unset( $e );
+}
+$_POST = [];
+$_GET  = [ 'tab' => 'unknown_tab_name' ];
+ob_start();
+AdminDashboard::instance()->render_dashboard();
+$unknown_tab_html = (string) ob_get_clean();
+$_GET             = [];
+assert_test(
+	'AdminDashboard purge_now executes retention and ?tab=unknown_tab renders Telemetry chain badge & rows cleanly',
+	HitLogger::REDACTED_MARKER === $wpdb->rows[1]->user_agent_excerpt
+		&& str_contains( $unknown_tab_html, 'HMAC CHAIN VALID' )
+		&& str_contains( $unknown_tab_html, '1-ppost' )
+		&& str_contains( $unknown_tab_html, '<hr class="wp-header-end" aria-hidden="true" />' )
 );
 
 echo "\n==============================================================================\n";

@@ -33,6 +33,10 @@ final class TokenSigner {
 		if ( function_exists( 'add_option' ) ) {
 			$added = add_option( self::SECRET_OPTION, $generated, '', true );
 			if ( ! $added ) {
+				if ( function_exists( 'wp_cache_delete' ) ) {
+					wp_cache_delete( self::SECRET_OPTION, 'options' );
+					wp_cache_delete( 'notoptions', 'options' );
+				}
 				$reread = get_option( self::SECRET_OPTION, '' );
 				if ( is_string( $reread ) && 1 === preg_match( '/^[a-f0-9]{64}$/', $reread ) ) {
 					return $reread;
@@ -51,7 +55,7 @@ final class TokenSigner {
 	 */
 	public static function sign( int $depth, string $seed, ?string $secret = null ): string {
 		$clamped_depth = max( 1, min( 16, $depth ) );
-		$clean_seed    = strtolower( (string) preg_replace( '/[^a-z0-9]/', '', $seed ) );
+		$clean_seed    = (string) preg_replace( '/[^a-z0-9]/', '', strtolower( $seed ) );
 		if ( '' === $clean_seed ) {
 			$clean_seed = 'archroot0001';
 		} elseif ( strlen( $clean_seed ) < 4 ) {
@@ -103,32 +107,36 @@ final class TokenSigner {
 			return '0.0.0.0';
 		}
 
-		if ( 1 === preg_match( '/^\[([^\]]+)\](?::\d+)?$/', $trimmed, $m ) ) {
+		if ( 1 === preg_match( '/^\[([^\]]+)\](?::\d{1,5})?$/', $trimmed, $m ) ) {
 			$trimmed = $m[1];
-		} elseif ( 1 === preg_match( '/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/', $trimmed, $m ) ) {
+		} elseif ( 1 === preg_match( '/^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/', $trimmed, $m ) ) {
 			$trimmed = $m[1];
+		}
+
+		$zone_pos = strpos( $trimmed, '%' );
+		if ( false !== $zone_pos && $zone_pos > 0 ) {
+			$trimmed = substr( $trimmed, 0, $zone_pos );
 		}
 
 		$lower = strtolower( $trimmed );
-		if ( str_starts_with( $lower, '::ffff:' ) ) {
-			$mapped = substr( $lower, 7 );
-			if ( 1 === preg_match( '/^\d{1,3}(?:\.\d{1,3}){3}$/', $mapped ) ) {
-				return $mapped;
-			}
-		}
-
 		if ( str_contains( $lower, ':' ) && false !== filter_var( $lower, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) {
 			$packed = inet_pton( $lower );
 			if ( false !== $packed ) {
 				$canonical = inet_ntop( $packed );
 				if ( is_string( $canonical ) && '' !== $canonical ) {
-					return $canonical;
+					$lower = strtolower( $canonical );
 				}
 			}
-			return $lower;
 		}
 
-		return $trimmed;
+		if ( str_starts_with( $lower, '::ffff:' ) ) {
+			$mapped = substr( $lower, 7 );
+			if ( false !== filter_var( $mapped, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+				return $mapped;
+			}
+		}
+
+		return $lower;
 	}
 
 	/**

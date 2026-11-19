@@ -348,7 +348,7 @@
 	padding-top: var(--cl-space-1);
 }
 
-.cl-input,
+.cl-admin .cl-input,
 .cl-admin select.cl-input {
 	background-color: var(--cl-surface);
 	border: var(--cl-border-width) solid var(--cl-border-strong);
@@ -461,6 +461,10 @@
 	color: var(--cl-ok-text);
 }
 
+.cl-widget-banner > div {
+	min-width: var(--cl-space-0);
+}
+
 .cl-widget-title {
 	font-size: var(--cl-text-sm);
 	font-weight: 700;
@@ -469,6 +473,7 @@
 .cl-widget-sub {
 	font-family: var(--cl-font-mono);
 	font-size: var(--cl-text-xs);
+	overflow-wrap: anywhere;
 }
 
 .cl-widget-kpi-grid {
@@ -527,6 +532,11 @@
 	.cl-fieldset {
 		border: var(--cl-border-width) solid ButtonText;
 		forced-color-adjust: auto;
+	}
+
+	.cl-tab-link.is-active {
+		border-color: Highlight;
+		border-width: var(--cl-focus-width);
 	}
 
 	.cl-admin :is(a, button, input, select, textarea, [tabindex]):focus-visible,

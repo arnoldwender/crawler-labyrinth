@@ -178,4 +178,64 @@ return [
 			[ 'uninstall.php', 'if ( ! $crawler_labyrinth_blog_opt_in ) {', 'if ( false && ! $crawler_labyrinth_blog_opt_in ) {' ],
 		],
 	],
+	[
+		'HitLogger::record stops filtering spoofed literal [REDACTED] User-Agents',
+		[
+			[ 'includes/Audit/HitLogger.php', "if ( self::REDACTED_MARKER === \$excerpt && self::RETENTION_ACTION !== \$action_taken ) {\n\t\t\t\$excerpt = '(filtered)';\n\t\t}", 'if ( false ) {}' ],
+		],
+	],
+	[
+		'HitLogger::purge_expired skips HMAC verification letting retention erase tamper evidence',
+		[
+			[ 'includes/Audit/HitLogger.php', "if ( ! hash_equals( \$expected, (string) ( \$row->row_hash ?? '' ) ) ) {\n\t\t\t\t\tcontinue;\n\t\t\t\t}", 'if ( false ) { continue; }' ],
+		],
+	],
+	[
+		'TrapRouter drops active_quarantine_max persistence breaking cross-day lookback',
+		[
+			[ 'includes/Core/TrapRouter.php', "if ( \$quarantine_until > \$prev_max ) {\n\t\t\t\tupdate_option( 'crawler_labyrinth_active_quarantine_max', \$quarantine_until, true );\n\t\t\t}", 'if ( false ) {}' ],
+		],
+	],
+	[
+		'TrapRouter hardcodes lookback_days to 1 breaking multi-day quarantine',
+		[
+			[ 'includes/Core/TrapRouter.php', '$lookback_days = min( 7, max( 1, (int) ceil( $ttl_seconds / 86400 ) ) );', '$lookback_days = 1;' ],
+		],
+	],
+	[
+		'TrapRouter ignores enabled kill switch',
+		[
+			[ 'includes/Core/TrapRouter.php', "if ( ! \$settings['enabled'] || \$is_admin_user ) {", 'if ( $is_admin_user ) {' ],
+		],
+	],
+	[
+		'TokenSigner::client_ip trusts spoofable HTTP_X_FORWARDED_FOR header directly',
+		[
+			[ 'includes/Security/TokenSigner.php', "\$raw = isset( \$_SERVER['REMOTE_ADDR'] ) && is_scalar( \$_SERVER['REMOTE_ADDR'] )\n\t\t\t? sanitize_text_field( wp_unslash( (string) \$_SERVER['REMOTE_ADDR'] ) )\n\t\t\t: '0.0.0.0';", "\$raw = isset( \$_SERVER['HTTP_X_FORWARDED_FOR'] ) ? (string) \$_SERVER['HTTP_X_FORWARDED_FOR'] : ( (string) ( \$_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' ) );" ],
+		],
+	],
+	[
+		'TokenSigner::verify drops upper depth <= 16 bound',
+		[
+			[ 'includes/Security/TokenSigner.php', 'if ( $depth < 1 || $depth > 16 ) {', 'if ( false ) {' ],
+		],
+	],
+	[
+		'AdminDashboard::save_settings breaks purge_now form action',
+		[
+			[ 'includes/Admin/AdminDashboard.php', "} elseif ( 'purge_now' === \$form ) {\n\t\t\t\$redirect_tab = 'telemetry';\n\t\t\t\$updated_flag = 'purged';\n\t\t\t( new HitLogger() )->purge_expired( false );", "} elseif ( 'purge_now' === \$form ) {\n\t\t\t\$redirect_tab = 'telemetry';\n\t\t\t\$updated_flag = 'purged';" ],
+		],
+	],
+	[
+		'RestController depth regex allows trailing newline via $ instead of \\z',
+		[
+			[ 'includes/API/RestController.php', "1 === preg_match( '/^\\d+\\z/', \$val )", "1 === preg_match( '/^\\d+$/', \$val )" ],
+		],
+	],
+	[
+		'Settings::sanitize_route_prefix drops >32 max length limit',
+		[
+			[ 'includes/Core/Settings.php', 'if ( strlen( $clean ) < 3 || strlen( $clean ) > 32 ) {', 'if ( strlen( $clean ) < 3 ) {' ],
+		],
+	],
 ];

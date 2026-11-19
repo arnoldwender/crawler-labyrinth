@@ -337,21 +337,6 @@ final class AdminDashboard {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only validation warning flag.
 		$prefix_fallback = isset( $_GET['prefix_fallback'] ) && '1' === sanitize_key( wp_unslash( (string) $_GET['prefix_fallback'] ) );
 
-		$settings    = Settings::all();
-		$logger      = new HitLogger();
-		$stats       = $logger->get_stats();
-		$chain       = 'telemetry' === $active_tab ? $logger->verify_chain() : null;
-		$recent_rows = 'telemetry' === $active_tab ? $logger->get_recent( 15 ) : [];
-
-		$notice_message = '';
-		if ( 'settings' === $updated_flag || 'true' === $updated_flag ) {
-			$notice_message = __( 'Labyrinth settings and retention schedule saved.', 'crawler-labyrinth' );
-		} elseif ( 'lifecycle' === $updated_flag ) {
-			$notice_message = __( 'Data lifecycle preference saved.', 'crawler-labyrinth' );
-		} elseif ( 'purged' === $updated_flag ) {
-			$notice_message = __( 'Pseudonymizing retention and expired transient cleanup completed.', 'crawler-labyrinth' );
-		}
-
 		$tabs = [
 			'telemetry' => [
 				'label' => __( 'Telemetry & Audit', 'crawler-labyrinth' ),
@@ -372,6 +357,21 @@ final class AdminDashboard {
 		];
 		if ( ! isset( $tabs[ $active_tab ] ) ) {
 			$active_tab = 'telemetry';
+		}
+
+		$settings    = Settings::all();
+		$logger      = new HitLogger();
+		$stats       = $logger->get_stats();
+		$chain       = 'telemetry' === $active_tab ? $logger->verify_chain() : null;
+		$recent_rows = 'telemetry' === $active_tab ? $logger->get_recent( 15 ) : [];
+
+		$notice_message = '';
+		if ( 'settings' === $updated_flag || 'true' === $updated_flag ) {
+			$notice_message = __( 'Labyrinth settings and retention schedule saved.', 'crawler-labyrinth' );
+		} elseif ( 'lifecycle' === $updated_flag ) {
+			$notice_message = __( 'Data lifecycle preference saved.', 'crawler-labyrinth' );
+		} elseif ( 'purged' === $updated_flag ) {
+			$notice_message = __( 'Pseudonymizing retention and expired transient cleanup completed.', 'crawler-labyrinth' );
 		}
 		?>
 		<div class="wrap cl-admin">
@@ -394,7 +394,7 @@ final class AdminDashboard {
 					<?php endif; ?>
 				</div>
 			</header>
-			<hr class="wp-header-end" />
+			<hr class="wp-header-end" aria-hidden="true" />
 
 			<?php if ( '' !== $notice_message ) : ?>
 			<div class="notice notice-success is-dismissible cl-notice" role="status" aria-live="polite" tabindex="-1">
@@ -417,7 +417,7 @@ final class AdminDashboard {
 			</nav>
 
 			<?php if ( 'telemetry' === $active_tab ) : ?>
-			<section aria-labelledby="cl-telemetry-heading">
+			<section aria-label="<?php esc_attr_e( 'Telemetry Overview and Controls', 'crawler-labyrinth' ); ?>">
 				<div class="cl-grid-4">
 					<div class="cl-stat-card">
 						<span class="cl-stat-label"><?php esc_html_e( 'Honeypot Status', 'crawler-labyrinth' ); ?></span>
