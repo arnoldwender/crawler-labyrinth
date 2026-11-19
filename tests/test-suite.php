@@ -1401,12 +1401,16 @@ assert_test(
 		&& false === ( $preview_args['depth']['validate_callback'] )( "12\n" )
 );
 
-// 2. RobotsInjector places Disallow above trailing # comments before blank lines (matching TS patchRobotsTxt)
+// 2. RobotsInjector places Disallow above trailing # comments before blank lines and preserves RFC 9309 path case
 $robots_comment_blank = RobotsInjector::inject( "User-agent: Foo\nAllow: /\n# trailing note\n\nUser-agent: *\nAllow: /\n", 'crawler-trap' );
+$robots_mixed_case    = RobotsInjector::inject( "User-agent: *\nDisallow: /My-Trap/\n", 'my-trap' );
+$robots_case_field    = RobotsInjector::inject( "User-agent: Foo\nAllow: /\nDISALLOW:/crawler-trap/\n", 'crawler-trap' );
 assert_test(
-	'RobotsInjector inserts Disallow above trailing # comments before blank lines',
-	str_contains( $robots_comment_blank, "Allow: /\nDisallow: /crawler-trap/\n# trailing note\n" ),
-	$robots_comment_blank
+	'RobotsInjector inserts Disallow above trailing # comments and treats path matching case-sensitively per RFC 9309',
+	str_contains( $robots_comment_blank, "Allow: /\nDisallow: /crawler-trap/\n# trailing note\n" )
+		&& str_contains( $robots_mixed_case, "Disallow: /My-Trap/\nDisallow: /my-trap/\n" )
+		&& ! str_contains( $robots_case_field, 'Disallow: /crawler-trap/' ),
+	$robots_mixed_case
 );
 
 // 3. TrapRouter kill switch, active_quarantine_max persistence, and d >= 2..7 lookback rollover

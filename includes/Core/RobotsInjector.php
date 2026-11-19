@@ -87,8 +87,7 @@ final class RobotsInjector {
 
 			if ( $in_group && $is_directive ) {
 				$has_non_ua_directive = true;
-				$canonical_directive  = (string) preg_replace( '/^(allow|disallow)\s*:\s*/i', '$1: ', $no_comment );
-				if ( 0 === strcasecmp( $canonical_directive, $rule ) ) {
+				if ( self::normalize_rule_compare( $no_comment ) === self::normalize_rule_compare( $rule ) ) {
 					$group_has_disallow = true;
 				}
 			} elseif ( $in_group && $is_blank ) {
@@ -133,5 +132,15 @@ final class RobotsInjector {
 			$lines[] = $t;
 		}
 		return $lines;
+	}
+
+	private static function normalize_rule_compare( string $directive ): string {
+		$colon_pos = strpos( $directive, ':' );
+		if ( false === $colon_pos ) {
+			return strtolower( trim( $directive ) );
+		}
+		$field = strtolower( trim( substr( $directive, 0, $colon_pos ) ) );
+		$value = trim( substr( $directive, $colon_pos + 1 ) );
+		return $field . ':' . $value;
 	}
 }
