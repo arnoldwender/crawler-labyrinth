@@ -98,8 +98,11 @@ final class DecoyGenerator {
 	): array {
 		$bounded_depth = max( 1, min( 16, $depth ) );
 		$bounded_max   = max( 1, min( 16, $max_depth ) );
+		$clean_prefix  = Settings::sanitize_route_prefix( $route_prefix );
 		$clean_seed    = strtolower( (string) preg_replace( '/[^a-z0-9]/', '', $seed ) );
-		if ( strlen( $clean_seed ) < 4 ) {
+		if ( '' === $clean_seed ) {
+			$clean_seed = 'archroot0001';
+		} elseif ( strlen( $clean_seed ) < 4 ) {
 			$clean_seed = substr( $clean_seed . 'arch0001', 0, 12 );
 		}
 		$clean_seed = substr( $clean_seed, 0, 24 );
@@ -147,10 +150,11 @@ final class DecoyGenerator {
 			$child_tokens[] = TokenSigner::sign( $next_depth, $child_seed, $secret_key );
 		}
 
-		$is_plain = 'plain' === strtolower( $format );
-		$body     = $is_plain
-			? $this->render_plain( $title, $entry_code, $paragraphs, $child_tokens, $route_prefix )
-			: $this->render_html( $title, $entry_code, $paragraphs, $child_tokens, $route_prefix );
+		$base_path = Settings::base_path();
+		$is_plain  = 'plain' === strtolower( $format );
+		$body      = $is_plain
+			? $this->render_plain( $title, $entry_code, $paragraphs, $child_tokens, $clean_prefix, $base_path )
+			: $this->render_html( $title, $entry_code, $paragraphs, $child_tokens, $clean_prefix, $base_path );
 
 		return [
 			'status'       => 200,
@@ -218,7 +222,8 @@ final class DecoyGenerator {
 		string $entry_code,
 		array $paragraphs,
 		array $child_tokens,
-		string $route_prefix
+		string $route_prefix,
+		string $base_path
 	): string {
 		$esc          = static fn( string $text ): string => htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
 		$prefix_clean = trim( $route_prefix, '/' );
@@ -245,7 +250,7 @@ final class DecoyGenerator {
 		$lines[] = '<nav aria-label="Cross-References">';
 		$lines[] = '<ul>';
 		foreach ( $child_tokens as $idx => $token ) {
-			$href    = '/' . $prefix_clean . '/' . rawurlencode( $token ) . '/';
+			$href    = $base_path . '/' . $prefix_clean . '/' . rawurlencode( $token ) . '/';
 			$label   = 'Cross-Reference Entry ' . ( $idx + 1 ) . ' (' . substr( $token, 0, 14 ) . ')';
 			$lines[] = '<li><a href="' . $esc( $href ) . '" rel="nofollow noopener">' . $esc( $label ) . '</a></li>';
 		}
@@ -270,7 +275,8 @@ final class DecoyGenerator {
 		string $entry_code,
 		array $paragraphs,
 		array $child_tokens,
-		string $route_prefix
+		string $route_prefix,
+		string $base_path
 	): string {
 		$prefix_clean = trim( $route_prefix, '/' );
 		$lines        = [
@@ -287,7 +293,7 @@ final class DecoyGenerator {
 
 		$lines[] = 'Cross-References:';
 		foreach ( $child_tokens as $token ) {
-			$lines[] = '- /' . $prefix_clean . '/' . $token . '/';
+			$lines[] = '- ' . $base_path . '/' . $prefix_clean . '/' . $token . '/';
 		}
 
 		return implode( "\n", $lines ) . "\n";

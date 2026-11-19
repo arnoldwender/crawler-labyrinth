@@ -30,7 +30,19 @@ final class TokenSigner {
 		}
 
 		$generated = bin2hex( random_bytes( 32 ) );
-		update_option( self::SECRET_OPTION, $generated, false );
+		if ( function_exists( 'add_option' ) ) {
+			$added = add_option( self::SECRET_OPTION, $generated, '', true );
+			if ( ! $added ) {
+				$reread = get_option( self::SECRET_OPTION, '' );
+				if ( is_string( $reread ) && 1 === preg_match( '/^[a-f0-9]{64}$/', $reread ) ) {
+					return $reread;
+				}
+				update_option( self::SECRET_OPTION, $generated, true );
+			}
+			return $generated;
+		}
+
+		update_option( self::SECRET_OPTION, $generated, true );
 		return $generated;
 	}
 
@@ -40,8 +52,10 @@ final class TokenSigner {
 	public static function sign( int $depth, string $seed, ?string $secret = null ): string {
 		$clamped_depth = max( 1, min( 16, $depth ) );
 		$clean_seed    = strtolower( (string) preg_replace( '/[^a-z0-9]/', '', $seed ) );
-		if ( strlen( $clean_seed ) < 4 ) {
-			$clean_seed = substr( $clean_seed . '0000', 0, 8 );
+		if ( '' === $clean_seed ) {
+			$clean_seed = 'archroot0001';
+		} elseif ( strlen( $clean_seed ) < 4 ) {
+			$clean_seed = substr( $clean_seed . 'arch0001', 0, 12 );
 		}
 		$clean_seed = substr( $clean_seed, 0, 24 );
 
@@ -81,12 +95,49 @@ final class TokenSigner {
 	}
 
 	/**
+	 * Canonicalize client IPv4/IPv6 strings (stripping ports, brackets, IPv4-mapped prefix, uppercase hex).
+	 */
+	public static function normalize_ip( string $raw_ip ): string {
+		$trimmed = trim( $raw_ip );
+		if ( '' === $trimmed ) {
+			return '0.0.0.0';
+		}
+
+		if ( 1 === preg_match( '/^\[([^\]]+)\](?::\d+)?$/', $trimmed, $m ) ) {
+			$trimmed = $m[1];
+		} elseif ( 1 === preg_match( '/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/', $trimmed, $m ) ) {
+			$trimmed = $m[1];
+		}
+
+		$lower = strtolower( $trimmed );
+		if ( str_starts_with( $lower, '::ffff:' ) ) {
+			$mapped = substr( $lower, 7 );
+			if ( 1 === preg_match( '/^\d{1,3}(?:\.\d{1,3}){3}$/', $mapped ) ) {
+				return $mapped;
+			}
+		}
+
+		if ( str_contains( $lower, ':' ) && false !== filter_var( $lower, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) {
+			$packed = inet_pton( $lower );
+			if ( false !== $packed ) {
+				$canonical = inet_ntop( $packed );
+				if ( is_string( $canonical ) && '' !== $canonical ) {
+					return $canonical;
+				}
+			}
+			return $lower;
+		}
+
+		return $trimmed;
+	}
+
+	/**
 	 * Compute a keyed daily digest of a visitor IP address.
 	 * Raw IP addresses are never written to options, transients, or database tables.
 	 */
 	public static function ip_digest( string $raw_ip, ?string $utc_day = null, ?string $secret = null ): string {
 		$day = $utc_day ?? gmdate( 'Y-m-d' );
-		$ip  = '' !== trim( $raw_ip ) ? trim( $raw_ip ) : '0.0.0.0';
+		$ip  = self::normalize_ip( $raw_ip );
 		$key = $secret ?? self::ensure_secret();
 		return hash_hmac( 'sha256', $ip . '|' . $day, $key );
 	}

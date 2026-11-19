@@ -47,20 +47,19 @@ final class RestController {
 						'required'          => false,
 						'type'              => 'integer',
 						'default'           => 1,
-						'validate_callback' => static fn( $val ): bool => is_numeric( $val ) && (int) $val >= 1 && (int) $val <= 16,
+						'validate_callback' => static fn( $val ): bool => ( is_int( $val ) || ( is_string( $val ) && 1 === preg_match( '/^\d+\z/', $val ) ) ) && (int) $val >= 1 && (int) $val <= 16,
 						'sanitize_callback' => 'absint',
 					],
 					'seed'   => [
 						'required'          => false,
 						'type'              => 'string',
 						'default'           => 'archpreview1',
-						'validate_callback' => static fn( $val ): bool => is_string( $val ) && 1 === preg_match( '/^[a-z0-9]{4,24}$/i', $val ),
+						'validate_callback' => static fn( $val ): bool => is_string( $val ) && 1 === preg_match( '/\A[a-z0-9]{4,24}\z/i', $val ),
 						'sanitize_callback' => 'sanitize_text_field',
 					],
 					'format' => [
 						'required'          => false,
 						'type'              => 'string',
-						'default'           => 'html',
 						'enum'              => [ 'html', 'plain' ],
 						'sanitize_callback' => 'sanitize_key',
 					],
@@ -101,11 +100,9 @@ final class RestController {
 		$settings = Settings::all();
 		$depth    = Settings::clamp_int( $request->get_param( 'depth' ) ?? 1, 1, 16, 1 );
 		$seed_raw = $request->get_param( 'seed' );
-		$seed     = is_string( $seed_raw ) ? strtolower( sanitize_text_field( $seed_raw ) ) : 'archpreview1';
-		$fmt_raw  = $request->get_param( 'format' );
-		$format   = is_string( $fmt_raw ) ? Settings::sanitize_format( $fmt_raw ) : (string) $settings['response_format'];
-
-		if ( 1 !== preg_match( '/^[a-z0-9]{4,24}$/', $seed ) ) {
+		if ( null === $seed_raw ) {
+			$seed = 'archpreview1';
+		} elseif ( ! is_string( $seed_raw ) || 1 !== preg_match( '/\A[a-z0-9]{4,24}\z/i', $seed_raw ) ) {
 			return new WP_REST_Response(
 				[
 					'success' => false,
@@ -113,7 +110,12 @@ final class RestController {
 				],
 				400
 			);
+		} else {
+			$seed = strtolower( $seed_raw );
 		}
+
+		$fmt_raw = $request->get_param( 'format' );
+		$format  = is_string( $fmt_raw ) ? Settings::sanitize_format( $fmt_raw ) : (string) $settings['response_format'];
 
 		$decoy = ( new DecoyGenerator() )->generate(
 			$depth,
