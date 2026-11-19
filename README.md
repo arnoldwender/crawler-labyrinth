@@ -22,6 +22,7 @@
 | **Companion Astro Package** | [arnoldwender/astro-crawler-labyrinth](https://github.com/arnoldwender/astro-crawler-labyrinth) |
 | **Stack & Requirements** | WordPress 6.4+ · PHP 8.2+ · Pure PHP (no external proxy calls) |
 | **License** | [GPLv2 or later](LICENSE) |
+| **Support & Liability** | **Zero support** — reproducible bugs on [GitHub Issues](https://github.com/arnoldwender/crawler-labyrinth/issues) only · **no private support** · **AS IS / no liability** ([SUPPORT.md](SUPPORT.md)) |
 | **Local Verification** | `php tests/test-suite.php && php tests/test-css-tokens.php && bash tests/run-mutations.sh` |
 
 ---
@@ -172,10 +173,22 @@ wp eval-file wp-content/plugins/crawler-labyrinth/tests/test-runtime.php --allow
 
 ---
 
+## Support, Bug Reports & Zero Liability
+
+> **Zero Support & Use at Your Own Risk:** See [SUPPORT.md](SUPPORT.md).
+
+- **Zero support:** This plugin is published as-is with **zero technical, setup, configuration, or user support**, and zero response SLA.
+- **GitHub Issues only:** Reproducible software defects must be reported **exclusively** via [GitHub Issues](https://github.com/arnoldwender/crawler-labyrinth/issues) (or [GitHub Security Advisories](https://github.com/arnoldwender/crawler-labyrinth/security/advisories/new) for security vulnerabilities). Opening an issue carries no guarantee of a reply or fix.
+- **No private support:** **Do not** send private support requests via email, `arnoldwender.com`, or direct messages. Private inquiries are never answered.
+- **Zero responsibility & no warranty ("AS IS"):** Under Sections 11 and 12 of the [GNU General Public License v2 or later](LICENSE), this software is provided **"AS IS"** without warranty of any kind, and the author accepts **zero responsibility or liability** for any damages, downtime, data loss, false positives, caching/proxy misbehavior, or search/crawler indexing effects arising from its use.
+
+---
+
 ## Contributing & Security
 
+- **Support Policy:** See [SUPPORT.md](SUPPORT.md) — **zero support** and **no private support** under any circumstances.
 - **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-- **Security Policy:** See [SECURITY.md](SECURITY.md) — please use GitHub Private Vulnerability Reporting instead of public issues.
+- **Security Policy:** See [SECURITY.md](SECURITY.md) — submit vulnerability reports **exclusively** via GitHub Private Vulnerability Reporting, never privately via email or public issues.
 
 ## License
 
