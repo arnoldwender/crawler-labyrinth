@@ -7,16 +7,11 @@ node_modules/
 .env.*
 !.env.example
 
-# Local editor, OS, and assistant scratch files
+# Local editor and OS files
 .DS_Store
 .vscode/
 .idea/
 *.log
-CLAUDE.md
-AGENTS.md
-GEMINI.md
-.claude/
-.gemini/
 
 # Build & test caches
 /dist/

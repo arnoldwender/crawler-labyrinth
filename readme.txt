@@ -4,7 +4,7 @@ Tags: security, robots, honeypot, crawler, tarpit
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -15,7 +15,7 @@ Local deterministic crawler tarpit and RFC 9309 robots.txt honeypot with hybrid 
 Crawler Labyrinth defends WordPress sites against automated scrapers that ignore `robots.txt` directives, without external proxies, third-party APIs, or outbound HTTP latency.
 
 1. **RFC 9309 Multi-Group `robots.txt` Injection:** Automatically injects `Disallow: /<prefix>/` into every `User-agent:` group so explicit `Allow: /` rules for search or citation crawlers cannot shadow the disallow rule.
-2. **Accessible-Inert Footer Bait:** Prints `<div hidden aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 trap links carrying `rel="nofollow noopener"`, `tabindex="-1"`, and `aria-hidden="true"` on unauthenticated public frontend pages only.
+2. **Accessible-Inert Footer Bait:** Prints `<div hidden inert aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 trap links carrying `rel="nofollow noopener"`, `tabindex="-1"`, and `aria-hidden="true"` on unauthenticated public frontend pages only.
 3. **Deterministic Local Labyrinth & Hybrid Quarantine:** `DecoyGenerator` synthesizes archival cataloguing pages (`HTML5` or `text/plain`) using local HMAC-SHA256 derivation. In `hybrid` mode (default), scrapers receive bounded-depth decoy pages up to `crawler_labyrinth_strike_threshold` hits and are then quarantined with HTTP `429` (`Retry-After`) or `403` for `crawler_labyrinth_block_ttl_minutes`. Modes `labyrinth` and `block` are also available.
 4. **Search & Citation Crawler Exemptions:** Optional opt-in training-UA interception (`crawler_labyrinth_intercept_training_ua`) is disabled by default and strictly exempts search, citation, and preview bots (`Googlebot`, `Bingbot`, `Applebot`, `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `MistralAI-User`, `Slackbot`, `Storebot-Google`, `DuckDuckBot`).
 5. **Tamper-Evident Audit Chain & Privacy:** Hits are logged to `{prefix}crawler_labyrinth_hits` using daily rotating keyed HMAC-SHA256 IP digests (raw IPs are never persisted) chained with `prev_hash` / `row_hash`. Scheduled daily retention redacts expired `user_agent_excerpt` fields while keeping chain verification intact.
@@ -36,7 +36,7 @@ No. All decoy documents, link tokens, and IP digests are generated locally insid
 
 = Will search engines or screen readers follow the hidden link? =
 
-Search engines that honor `robots.txt` are disallowed from `/<prefix>/` across every `User-agent:` group, and decoy responses also include `X-Robots-Tag` and `<meta name="robots">` with `noindex, nofollow, noarchive, nosnippet, noai, noimageai`. Assistive technology and keyboard navigation skip `<div hidden aria-hidden="true">` with `tabindex="-1"`.
+Search engines that honor `robots.txt` are disallowed from `/<prefix>/` across every `User-agent:` group, and decoy responses also include `X-Robots-Tag` and `<meta name="robots">` with `noindex, nofollow, noarchive, nosnippet, noai, noimageai` alongside `DONOTCACHEPAGE`. Assistive technology and keyboard navigation skip `<div hidden inert aria-hidden="true">` with `tabindex="-1"`.
 
 = Are stored options and logs removed when uninstalling? =
 
@@ -53,6 +53,11 @@ No. This plugin is provided with zero support (`0` support). Private inquiries v
 3. Decoy & robots.txt Preview tab inspecting generated synthetic HTML5 entries and multi-group Disallow injection.
 
 == Changelog ==
+
+= 1.0.2 =
+* Security and request routing: hardened subdirectory (`base_path`) normalization and segment-bounded route exclusions, switched to `wp_parse_url()`, enforced remote IP parsing without trusting spoofable forwarding headers by default, bounded verified trap depth (`<= 16`), added HTTP `HEAD` empty-body responses, removed `Retry-After` from `403` responses, and cleared object-cache `notoptions` entries on concurrent HMAC secret initialization.
+* Audit log and retention: added MySQL `GET_LOCK`/`RELEASE_LOCK` append serialization, keyset-paginated `verify_chain()` with strict `prev_hash` linkage validation, multi-batch `purge_expired()`, `[REDACTED]` User-Agent spoof filtering, and UTF-8 `mb_substr()` truncation matching `VARCHAR(191)`.
+* Compatibility and accessibility: fixed `RobotsInjector` RFC 9309 case-sensitive path matching, `#` comment ordering before blank lines, lowercase/empty seed canonicalization parity, `.cl-admin .cl-input` border contrast (`#64748b`), `44px` touch targets, `320px` reflow guards, `forced-colors` active tab highlight, safe `?tab=` fallback clamping, and expanded standalone tests (54 passing) plus 39 mutation checks.
 
 = 1.0.1 =
 * Explicit zero-support, GitHub-only bug reporting, no-private-support, and no-warranty / zero-liability ("AS IS") notices added to `SUPPORT.md`, `README.md`, `readme.txt`, `SECURITY.md`, `CONTRIBUTING.md`, and GitHub issue templates.

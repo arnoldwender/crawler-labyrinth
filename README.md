@@ -44,13 +44,13 @@ Many crawler-tarpit snippets work by fetching and relaying third-party HTML from
 </p>
 
 1. **RFC 9309 Multi-Group `robots.txt` Injection (`RobotsInjector`):** Injects `Disallow: /<prefix>/` into **every** `User-agent:` group (not only `User-agent: *`), preventing explicit `Allow: /` blocks for search or citation crawlers from shadowing the disallow rule.
-2. **Accessible-Inert Footer Bait (`BaitRenderer`):** Prints `<div hidden aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 links (`rel="nofollow noopener"`, `tabindex="-1"`, `aria-hidden="true"`) in `wp_footer` on unauthenticated public frontend responses only. Screen readers and keyboard tab order skip it automatically; logged-in users, feeds, previews, AJAX, and REST requests are excluded.
+2. **Accessible-Inert Footer Bait (`BaitRenderer`):** Prints `<div hidden inert aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 links (`rel="nofollow noopener"`, `tabindex="-1"`, `aria-hidden="true"`) in `wp_footer` on unauthenticated public frontend responses only. Screen readers and keyboard tab order skip it automatically; logged-in users, feeds, previews, AJAX, and REST requests are excluded.
 3. **Bounded Labyrinth & Hybrid Quarantine (`TrapRouter`):**
    - **`hybrid` (default):** Serves deterministic archival decoys (`200 OK` with `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noai, noimageai`) up to `crawler_labyrinth_strike_threshold` hits (default `5`), then quarantines the client IP digest with HTTP `429 Too Many Requests` (including `Retry-After`) or `403 Forbidden` for `crawler_labyrinth_block_ttl_minutes`.
    - **`labyrinth`:** Continues serving ring-bounded archival decoys indefinitely without quarantining.
    - **`block`:** Immediately quarantines on the first disallowed hit.
 4. **Search & Citation Crawler Protection:** Optional User-Agent enforcement (`crawler_labyrinth_intercept_training_ua`, disabled by default) explicitly exempts search, citation, and link-preview bots (`Googlebot`, `Bingbot`, `Applebot`, `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `MistralAI-User`, `Slackbot`, `Storebot-Google`, `DuckDuckBot`) before evaluating training scraper tokens (`GPTBot`, `CCBot`, `ClaudeBot`, `anthropic-ai`, `Bytespider`, `PetalBot`, `Diffbot`, `Omgilibot`, `ImagesiftBot`, `DataForSeoBot`, `Scrapy`).
-5. **Tamper-Evident Audit Chain & Pseudonymizing Retention (`HitLogger`):** Records hits in `{prefix}crawler_labyrinth_hits` using daily rotating keyed HMAC-SHA256 IP digests (raw IP addresses are never stored). Each row links to the previous `row_hash` (`prev_hash`). A daily WP-Cron job (`crawler_labyrinth_daily_purge`) redacts expired `user_agent_excerpt` values while writing a verifiable `retention_pseudonymized` residual hash record so chain integrity remains verifiable.
+5. **Tamper-Evident Audit Chain & Pseudonymizing Retention (`HitLogger`):** Records hits in `{prefix}crawler_labyrinth_hits` using daily rotating keyed HMAC-SHA256 IP digests (raw IP addresses are never stored). Each row links to the previous `row_hash` (`prev_hash`). A daily WP-Cron job (`crawler_labyrinth_daily_purge`) redacts expired `user_agent_excerpt` values across batches, removes expired transients, and appends an advisory-locked (`GET_LOCK`) `retention_pseudonymized` residual hash record so keyset-paginated chain integrity (`verify_chain()`) remains verifiable.
 6. **Standalone Admin UI:** Ships a self-contained, token-based stylesheet (`assets/css/crawler-labyrinth-admin.css`) with zero external dependencies and a WordPress Dashboard telemetry widget.
 
 ---
@@ -88,7 +88,7 @@ Live `Telemetry & Audit` view displaying `HONEYPOT STATUS` (`Active`, `/crawler-
 
 ### Decoy & `robots.txt` Preview
 
-`Decoy & robots.txt Preview` tab inspecting a live `Sample Synthetic Archival Entry` (`Cartographic Index C188-8714 (Section 1)`) and the `RFC 9309 robots.txt Group Injection Preview`.
+`Decoy & robots.txt Preview` tab inspecting a live `Sample Synthetic Archival Entry` and the `RFC 9309 robots.txt Group Injection Preview`.
 
 <p align="center">
   <img src="docs/images/wp-admin-preview.png" alt="Crawler Labyrinth Decoy and robots.txt Preview WordPress admin tab" />
@@ -115,6 +115,7 @@ Live `Telemetry & Audit` view displaying `HONEYPOT STATUS` (`Active`, `/crawler-
 | `crawler_labyrinth_delete_data_on_uninstall` | `'0'` | `'1'` \| `'0'` | Opt-in removal of options, transients, and audit table on uninstall |
 | `crawler_labyrinth_hmac_secret` | Auto-generated | 64-char hex | Persistent 256-bit key for tokens, digests, and hash chain |
 | `crawler_labyrinth_schema_version` | `'1.0.0'` | SemVer string | Internal database schema version marker |
+| `crawler_labyrinth_active_quarantine_max` | `0` | Unix timestamp | High-water mark skipping multi-day quarantine lookback when no bans are active |
 
 ---
 

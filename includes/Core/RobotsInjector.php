@@ -19,27 +19,31 @@ final class RobotsInjector {
 		add_filter( 'robots_txt', [ $this, 'filter_robots_txt' ], 999, 2 );
 	}
 
-	public function filter_robots_txt( string $output, bool $public = true ): string {
+	public function filter_robots_txt( string $output, mixed $public = true ): string {
 		unset( $public );
 		$settings = Settings::all();
 		if ( ! $settings['enabled'] || ! $settings['update_robots'] ) {
 			return $output;
 		}
-		return self::inject( $output, (string) $settings['route_prefix'] );
+		return self::inject( $output, (string) $settings['route_prefix'], Settings::base_path() );
 	}
 
 	/**
 	 * Inject `Disallow: /<prefix>/` into every RFC 9309 User-agent group so named Allow: /
 	 * groups (such as OAI-SearchBot or PerplexityBot) do not shadow the wildcard rule.
 	 */
-	public static function inject( string $output, string $prefix ): string {
+	public static function inject( string $output, string $prefix, ?string $base_path = null ): string {
 		$clean_prefix = Settings::sanitize_route_prefix( $prefix );
-		$rule         = 'Disallow: /' . $clean_prefix . '/';
+		$raw_base     = $base_path ?? Settings::base_path();
+		$trimmed_base = trim( $raw_base, '/' );
+		$base         = '' === $trimmed_base ? '' : '/' . $trimmed_base;
+		$rule         = 'Disallow: ' . $base . '/' . $clean_prefix . '/';
+		$eol          = str_contains( $output, "\r\n" ) ? "\r\n" : "\n";
 		$normalized   = str_replace( [ "\r\n", "\r" ], "\n", $output );
 		$lines        = '' === trim( $normalized ) ? [] : explode( "\n", rtrim( $normalized, "\n" ) );
 
 		if ( [] === $lines ) {
-			return "User-agent: *\n" . $rule . "\n";
+			return 'User-agent: *' . $eol . $rule . $eol;
 		}
 
 		$result               = [];
@@ -49,9 +53,12 @@ final class RobotsInjector {
 		$found_any_ua         = false;
 
 		foreach ( $lines as $line ) {
-			$trimmed = trim( $line );
-			$is_ua   = 1 === preg_match( '/^user-agent\s*:/i', $trimmed );
-			$is_meta = '' === $trimmed || str_starts_with( $trimmed, '#' ) || 1 === preg_match( '/^sitemap\s*:/i', $trimmed );
+			$trimmed       = trim( $line );
+			$no_comment    = trim( (string) preg_replace( '/\s*#.*$/', '', $trimmed ) );
+			$is_ua         = 1 === preg_match( '/^user-agent\s*:/i', $no_comment );
+			$is_sitemap    = 1 === preg_match( '/^sitemap\s*:/i', $no_comment );
+			$is_blank      = '' === $trimmed;
+			$is_directive  = '' !== $no_comment && ! $is_ua && ! $is_sitemap;
 
 			if ( $is_ua ) {
 				$found_any_ua = true;
@@ -67,14 +74,25 @@ final class RobotsInjector {
 				continue;
 			}
 
-			if ( $in_group && ! $is_meta ) {
+			if ( $is_sitemap ) {
+				if ( $in_group && ! $group_has_disallow ) {
+					$result = self::insert_before_trailing_blanks( $result, $rule );
+				}
+				$in_group             = false;
+				$has_non_ua_directive = false;
+				$group_has_disallow   = false;
+				$result[]             = $line;
+				continue;
+			}
+
+			if ( $in_group && $is_directive ) {
 				$has_non_ua_directive = true;
-				if ( 0 === strcasecmp( $trimmed, $rule ) ) {
+				if ( self::normalize_rule_compare( $no_comment ) === self::normalize_rule_compare( $rule ) ) {
 					$group_has_disallow = true;
 				}
-			} elseif ( $in_group && '' === $trimmed && $has_non_ua_directive ) {
+			} elseif ( $in_group && $is_blank ) {
 				if ( ! $group_has_disallow ) {
-					$result[] = $rule;
+					$result = self::insert_before_trailing_blanks( $result, $rule );
 				}
 				$in_group             = false;
 				$has_non_ua_directive = false;
@@ -93,7 +111,7 @@ final class RobotsInjector {
 			$result[] = $rule;
 		}
 
-		return implode( "\n", $result ) . "\n";
+		return implode( $eol, $result ) . $eol;
 	}
 
 	/**
@@ -114,5 +132,15 @@ final class RobotsInjector {
 			$lines[] = $t;
 		}
 		return $lines;
+	}
+
+	private static function normalize_rule_compare( string $directive ): string {
+		$colon_pos = strpos( $directive, ':' );
+		if ( false === $colon_pos ) {
+			return strtolower( trim( $directive ) );
+		}
+		$field = strtolower( trim( substr( $directive, 0, $colon_pos ) ) );
+		$value = trim( substr( $directive, $colon_pos + 1 ) );
+		return $field . ':' . $value;
 	}
 }

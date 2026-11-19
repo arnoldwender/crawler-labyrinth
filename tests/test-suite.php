@@ -23,7 +23,7 @@ if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
 	define( 'HOUR_IN_SECONDS', 3600 );
 }
 if ( ! defined( 'CRAWLER_LABYRINTH_VERSION' ) ) {
-	define( 'CRAWLER_LABYRINTH_VERSION', '1.0.1' );
+	define( 'CRAWLER_LABYRINTH_VERSION', '1.0.2' );
 }
 if ( ! defined( 'CRAWLER_LABYRINTH_FILE' ) ) {
 	define( 'CRAWLER_LABYRINTH_FILE', dirname( __DIR__ ) . '/crawler-labyrinth.php' );
@@ -35,17 +35,24 @@ if ( ! defined( 'CRAWLER_LABYRINTH_URL' ) ) {
 	define( 'CRAWLER_LABYRINTH_URL', 'https://example.test/wp-content/plugins/crawler-labyrinth/' );
 }
 
-global $mock_options, $mock_transients, $mock_filters, $mock_actions, $mock_fired_actions, $mock_user_caps, $mock_logged_in, $mock_is_admin, $mock_redirect_target, $mock_cron;
-$mock_options         = [];
-$mock_transients      = [];
-$mock_filters         = [];
-$mock_actions         = [];
-$mock_fired_actions   = [];
-$mock_user_caps       = [ 'manage_options' => true ];
-$mock_logged_in       = false;
-$mock_is_admin        = false;
-$mock_redirect_target = '';
-$mock_cron            = [];
+global $mock_options, $mock_blog_options, $mock_site_options, $mock_current_blog_id, $mock_is_multisite, $mock_home_url, $mock_transients, $mock_filters, $mock_actions, $mock_fired_actions, $mock_last_action_args, $mock_user_caps, $mock_logged_in, $mock_is_admin, $mock_redirect_target, $mock_cron, $mock_wpcli_messages;
+$mock_options           = [];
+$mock_blog_options      = [];
+$mock_site_options      = [];
+$mock_current_blog_id   = 1;
+$mock_is_multisite      = false;
+$mock_home_url          = 'https://example.test/';
+$mock_transients        = [];
+$mock_filters           = [];
+$mock_actions           = [];
+$mock_fired_actions     = [];
+$mock_last_action_args  = [];
+$mock_user_caps         = [ 'manage_options' => true ];
+$mock_logged_in         = false;
+$mock_is_admin          = false;
+$mock_redirect_target   = '';
+$mock_cron              = [];
+$mock_wpcli_messages    = [];
 
 class Crawler_Labyrinth_Test_Redirect extends RuntimeException {}
 
@@ -54,9 +61,17 @@ class Crawler_Labyrinth_Mock_WPDB {
 	public string $options = 'wp_options';
 	public int $insert_id  = 0;
 	/** @var array<int, object> */
-	public array $rows = [];
-	public bool $table_created = false;
-	public bool $table_dropped = false;
+	public array $rows               = [];
+	public bool $table_created       = false;
+	public bool $table_dropped       = false;
+	/** @var array<string, bool> */
+	public array $tables_dropped     = [];
+	public bool $lock_timeout        = false;
+	public bool $insert_fail         = false;
+	public int $lock_calls           = 0;
+	public int $unlock_calls         = 0;
+	public int $show_tables_queries  = 0;
+	public int $chain_select_queries = 0;
 
 	public function get_charset_collate(): string {
 		return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
@@ -86,6 +101,9 @@ class Crawler_Labyrinth_Mock_WPDB {
 
 	public function insert( string $table, array $data, array $format = [] ): int|false {
 		unset( $table, $format );
+		if ( $this->insert_fail ) {
+			return false;
+		}
 		$this->insert_id++;
 		$row                           = (object) ( [ 'id' => $this->insert_id ] + $data );
 		$this->rows[ $this->insert_id ] = $row;
@@ -105,7 +123,16 @@ class Crawler_Labyrinth_Mock_WPDB {
 	}
 
 	public function get_var( string $query ): mixed {
+		if ( str_contains( $query, 'SELECT GET_LOCK(' ) ) {
+			$this->lock_calls++;
+			return $this->lock_timeout ? '0' : '1';
+		}
+		if ( str_contains( $query, 'SELECT RELEASE_LOCK(' ) ) {
+			$this->unlock_calls++;
+			return '1';
+		}
 		if ( str_contains( $query, 'SHOW TABLES LIKE' ) ) {
+			$this->show_tables_queries++;
 			return $this->table_created && ! $this->table_dropped ? $this->prefix . 'crawler_labyrinth_hits' : null;
 		}
 		if ( str_contains( $query, 'SELECT row_hash' ) ) {
@@ -137,12 +164,44 @@ class Crawler_Labyrinth_Mock_WPDB {
 	}
 
 	/**
+	 * @return list<string>
+	 */
+	public function get_col( string $query ): array {
+		global $mock_transients;
+		$now = time();
+		if ( preg_match( '/CAST\(option_value AS UNSIGNED\)\s*<\s*(\d+)/', $query, $m ) ) {
+			$now = (int) $m[1];
+		}
+		$expired = [];
+		foreach ( $mock_transients as $key => $entry ) {
+			if ( str_starts_with( $key, '__timeout_' ) ) {
+				if ( (int) $entry < $now ) {
+					$expired[] = '_transient_timeout_' . substr( $key, 10 );
+				}
+			}
+		}
+		return $expired;
+	}
+
+	/**
 	 * @return list<object>
 	 */
 	public function get_results( string $query ): array {
+		if ( str_contains( $query, 'WHERE id >' ) && str_contains( $query, 'crawler_labyrinth_hits`' ) && ! str_contains( $query, 'created_at <' ) ) {
+			$this->chain_select_queries++;
+		}
 		$rows = array_values( $this->rows );
 		if ( str_contains( $query, 'ORDER BY id DESC' ) ) {
 			$rows = array_reverse( $rows );
+		}
+		if ( preg_match( '/\bid\s*>\s*(\d+)/', $query, $m ) ) {
+			$min_id = (int) $m[1];
+			$rows   = array_values(
+				array_filter(
+					$rows,
+					static fn( $r ): bool => (int) $r->id > $min_id
+				)
+			);
 		}
 		if ( preg_match( "/created_at < '([^']+)'/", $query, $m ) ) {
 			$cutoff = $m[1];
@@ -163,13 +222,34 @@ class Crawler_Labyrinth_Mock_WPDB {
 
 	public function query( string $sql ): int|bool {
 		global $mock_transients;
-		if ( str_contains( $sql, 'DROP TABLE IF EXISTS' ) ) {
-			$this->rows          = [];
-			$this->table_dropped = true;
-			$this->table_created = false;
+		$normalized = str_replace( '\\', '', $sql );
+		if ( preg_match( '/DROP TABLE IF EXISTS\s+`?([^`\s]+)`?/i', $normalized, $m ) ) {
+			$this->rows                       = [];
+			$this->table_dropped              = true;
+			$this->table_created              = false;
+			$this->tables_dropped[ $m[1] ]    = true;
 			return true;
 		}
-		if ( str_contains( $sql, '_transient_crawler_labyrinth_' ) ) {
+		if ( preg_match_all( "/'(_transient_(?:timeout_)?[^']+)'/", $normalized, $matches ) && str_contains( $normalized, 'option_name IN' ) ) {
+			$deleted = 0;
+			foreach ( $matches[1] as $opt_name ) {
+				if ( str_starts_with( $opt_name, '_transient_timeout_' ) ) {
+					$k = '__timeout_' . substr( $opt_name, 19 );
+					if ( isset( $mock_transients[ $k ] ) ) {
+						unset( $mock_transients[ $k ] );
+						$deleted++;
+					}
+				} elseif ( str_starts_with( $opt_name, '_transient_' ) ) {
+					$k = substr( $opt_name, 11 );
+					if ( isset( $mock_transients[ $k ] ) ) {
+						unset( $mock_transients[ $k ] );
+						$deleted++;
+					}
+				}
+			}
+			return $deleted;
+		}
+		if ( str_contains( $normalized, '_transient_crawler_labyrinth_' ) ) {
 			$mock_transients = [];
 			return 1;
 		}
@@ -215,40 +295,119 @@ if ( ! function_exists( 'apply_filters' ) ) {
 }
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $tag, mixed ...$args ): void {
-		unset( $args );
-		global $mock_fired_actions;
-		$mock_fired_actions[ $tag ] = ( $mock_fired_actions[ $tag ] ?? 0 ) + 1;
+		global $mock_fired_actions, $mock_last_action_args;
+		$mock_fired_actions[ $tag ]     = ( $mock_fired_actions[ $tag ] ?? 0 ) + 1;
+		$mock_last_action_args[ $tag ]  = $args;
 	}
 }
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( string $option, mixed $default = false ): mixed {
-		global $mock_options;
+		global $mock_options, $mock_current_blog_id, $mock_blog_options, $mock_notoptions_poisoned;
+		if ( ! empty( $mock_notoptions_poisoned ) && 'crawler_labyrinth_hmac_secret' === $option ) {
+			return $default;
+		}
+		if ( 1 !== ( $mock_current_blog_id ?? 1 ) ) {
+			return $mock_blog_options[ $mock_current_blog_id ][ $option ] ?? $default;
+		}
 		return $mock_options[ $option ] ?? $default;
+	}
+}
+if ( ! function_exists( 'wp_cache_delete' ) ) {
+	function wp_cache_delete( string $key, string $group = '' ): bool {
+		global $mock_notoptions_poisoned;
+		if ( 'notoptions' === $key && 'options' === $group ) {
+			$mock_notoptions_poisoned = false;
+		}
+		return true;
 	}
 }
 if ( ! function_exists( 'get_site_option' ) ) {
 	function get_site_option( string $option, mixed $default = false ): mixed {
-		return get_option( $option, $default );
+		global $mock_site_options;
+		return $mock_site_options[ $option ] ?? $default;
+	}
+}
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( string $option, mixed $value = '', string $deprecated = '', mixed $autoload = null ): bool {
+		unset( $deprecated, $autoload );
+		global $mock_options, $mock_current_blog_id, $mock_blog_options, $mock_simulate_race_secret;
+		if ( 'crawler_labyrinth_hmac_secret' === $option && ! empty( $mock_simulate_race_secret ) ) {
+			$mock_options[ $option ]   = (string) $mock_simulate_race_secret;
+			$mock_simulate_race_secret = '';
+			return false;
+		}
+		if ( 1 !== ( $mock_current_blog_id ?? 1 ) ) {
+			if ( array_key_exists( $option, $mock_blog_options[ $mock_current_blog_id ] ?? [] ) ) {
+				return false;
+			}
+			$mock_blog_options[ $mock_current_blog_id ][ $option ] = $value;
+			return true;
+		}
+		if ( array_key_exists( $option, $mock_options ) ) {
+			return false;
+		}
+		$mock_options[ $option ] = $value;
+		return true;
 	}
 }
 if ( ! function_exists( 'update_option' ) ) {
 	function update_option( string $option, mixed $value, mixed $autoload = null ): bool {
 		unset( $autoload );
-		global $mock_options;
+		global $mock_options, $mock_current_blog_id, $mock_blog_options;
+		if ( 1 !== ( $mock_current_blog_id ?? 1 ) ) {
+			$mock_blog_options[ $mock_current_blog_id ][ $option ] = $value;
+			return true;
+		}
 		$mock_options[ $option ] = $value;
 		return true;
 	}
 }
 if ( ! function_exists( 'delete_option' ) ) {
 	function delete_option( string $option ): bool {
-		global $mock_options;
+		global $mock_options, $mock_current_blog_id, $mock_blog_options;
+		if ( 1 !== ( $mock_current_blog_id ?? 1 ) ) {
+			unset( $mock_blog_options[ $mock_current_blog_id ][ $option ] );
+			return true;
+		}
 		unset( $mock_options[ $option ] );
 		return true;
 	}
 }
 if ( ! function_exists( 'delete_site_option' ) ) {
 	function delete_site_option( string $option ): bool {
-		return delete_option( $option );
+		global $mock_site_options;
+		unset( $mock_site_options[ $option ] );
+		return true;
+	}
+}
+if ( ! function_exists( 'is_multisite' ) ) {
+	function is_multisite(): bool {
+		global $mock_is_multisite;
+		return (bool) ( $mock_is_multisite ?? false );
+	}
+}
+if ( ! function_exists( 'get_sites' ) ) {
+	/**
+	 * @param array<string, mixed> $args
+	 * @return list<int>
+	 */
+	function get_sites( array $args = [] ): array {
+		unset( $args );
+		return [ 1, 2 ];
+	}
+}
+if ( ! function_exists( 'switch_to_blog' ) ) {
+	function switch_to_blog( int $blog_id ): bool {
+		global $mock_current_blog_id, $wpdb;
+		$mock_current_blog_id = $blog_id;
+		$wpdb->prefix         = 1 === $blog_id ? 'wp_' : "wp_{$blog_id}_";
+		$wpdb->options        = $wpdb->prefix . 'options';
+		return true;
+	}
+}
+if ( ! function_exists( 'restore_current_blog' ) ) {
+	function restore_current_blog(): bool {
+		return switch_to_blog( 1 );
 	}
 }
 if ( ! function_exists( 'get_transient' ) ) {
@@ -432,7 +591,8 @@ if ( ! function_exists( 'admin_url' ) ) {
 }
 if ( ! function_exists( 'home_url' ) ) {
 	function home_url( string $path = '' ): string {
-		return 'https://example.test/' . ltrim( $path, '/' );
+		global $mock_home_url;
+		return rtrim( (string) ( $mock_home_url ?? 'https://example.test/' ), '/' ) . '/' . ltrim( $path, '/' );
 	}
 }
 if ( ! function_exists( 'add_query_arg' ) ) {
@@ -492,6 +652,23 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_CLI' ) ) {
+	class WP_CLI {
+		public static function line( string $msg ): void {
+			global $mock_wpcli_messages;
+			$mock_wpcli_messages[] = $msg;
+		}
+		public static function success( string $msg ): void {
+			global $mock_wpcli_messages;
+			$mock_wpcli_messages[] = 'SUCCESS:' . $msg;
+		}
+		public static function error( string $msg ): void {
+			global $mock_wpcli_messages;
+			$mock_wpcli_messages[] = 'ERROR:' . $msg;
+		}
+	}
+}
+
 spl_autoload_register(
 	static function ( string $class_name ): void {
 		$prefix   = 'CrawlerLabyrinth\\';
@@ -509,6 +686,7 @@ spl_autoload_register(
 use CrawlerLabyrinth\Admin\AdminDashboard;
 use CrawlerLabyrinth\API\RestController;
 use CrawlerLabyrinth\Audit\HitLogger;
+use CrawlerLabyrinth\CLI\LabyrinthCommand;
 use CrawlerLabyrinth\Core\Activator;
 use CrawlerLabyrinth\Core\BaitRenderer;
 use CrawlerLabyrinth\Core\RobotsInjector;
@@ -583,8 +761,14 @@ assert_test(
 $d1 = TokenSigner::ip_digest( '203.0.113.42', '2026-11-19', $secret );
 $d2 = TokenSigner::ip_digest( '203.0.113.42', '2026-11-20', $secret );
 assert_test(
-	'Keyed daily IP digest rotates by UTC day and never reveals raw IP',
-	64 === strlen( $d1 ) && $d1 !== $d2 && ! str_contains( $d1, '203.0.113' )
+	'Keyed daily IP digest uses secret key, rotates by UTC day, normalizes IPv6/mapped IPv4, and never reveals raw IP',
+	64 === strlen( $d1 )
+		&& $d1 !== $d2
+		&& $d1 !== TokenSigner::ip_digest( '203.0.113.42', '2026-11-19', str_repeat( 'b', 64 ) )
+		&& TokenSigner::ip_digest( '::1', '2026-11-19', $secret ) === TokenSigner::ip_digest( '[::1]:443', '2026-11-19', $secret )
+		&& TokenSigner::ip_digest( '2001:DB8::1', '2026-11-19', $secret ) === TokenSigner::ip_digest( '2001:0db8:0000:0000::1', '2026-11-19', $secret )
+		&& TokenSigner::ip_digest( '198.51.100.7', '2026-11-19', $secret ) === TokenSigner::ip_digest( '::ffff:198.51.100.7', '2026-11-19', $secret )
+		&& ! str_contains( $d1, '203.0.113' )
 );
 
 // Group 3: DecoyGenerator
@@ -629,8 +813,8 @@ $mock_logged_in = false;
 $mock_is_admin  = false;
 $bait           = BaitRenderer::build_markup( '/pricing/' );
 assert_test(
-	'BaitRenderer outputs hidden + aria-hidden + tabindex=-1 + rel=nofollow noopener without inline display:none',
-	str_contains( $bait, '<div hidden aria-hidden="true" data-crawler-labyrinth="1">' )
+	'BaitRenderer outputs hidden + inert + aria-hidden + tabindex=-1 + rel=nofollow noopener without inline display:none',
+	str_contains( $bait, '<div hidden inert aria-hidden="true" data-crawler-labyrinth="1">' )
 		&& 2 === substr_count( $bait, 'rel="nofollow noopener" tabindex="-1" aria-hidden="true"' )
 		&& ! str_contains( $bait, 'display:none' )
 		&& ! str_contains( $bait, 'display: none' ),
@@ -660,18 +844,24 @@ $mock_options    = [
 	'crawler_labyrinth_schema_version'        => Activator::SCHEMA_VERSION,
 ];
 $router = new TrapRouter();
+assert_test(
+	'DONOTCACHEPAGE is not defined before any trap hit',
+	! defined( 'DONOTCACHEPAGE' )
+);
 $r1     = $router->handle_request( '/crawler-trap/1-seedalpha1-0000/', 'BadScraper/1.0', '198.51.100.10', false );
 $r2     = $router->handle_request( '/crawler-trap/2-seedalpha2-0000/', 'BadScraper/1.0', '198.51.100.10', false );
 $r3     = $router->handle_request( '/crawler-trap/3-seedalpha3-0000/', 'BadScraper/1.0', '198.51.100.10', false );
 $r4     = $router->handle_request( '/ordinary-page/', 'BadScraper/1.0', '198.51.100.10', false );
 assert_test(
-	'Hybrid mode serves 200 decoys up to strike_threshold (2) then quarantines with HTTP 429 and Retry-After',
+	'Hybrid mode serves 200 decoys up to strike_threshold (2) then quarantines with HTTP 429, Retry-After, and DONOTCACHEPAGE',
 	200 === $r1['status']
 		&& 200 === $r2['status']
 		&& 429 === $r3['status']
 		&& isset( $r3['headers']['Retry-After'] )
 		&& true === $r4['handled']
 		&& 429 === $r4['status']
+		&& defined( 'DONOTCACHEPAGE' )
+		&& true === DONOTCACHEPAGE
 );
 $r_admin = $router->handle_request( '/crawler-trap/test/', 'BadScraper/1.0', '198.51.100.10', true );
 $r_wp    = $router->handle_request( '/wp-admin/', 'BadScraper/1.0', '198.51.100.10', false );
@@ -823,18 +1013,334 @@ assert_test(
 		&& ! Settings::is_training_only_ua( 'OAI-SearchBot/1.0 CustomScraperBot' )
 );
 
-// Uninstall opt-in test
+// Group 9: Subdirectory installs, path canonicalization, modes, multi-day quarantine, HEAD & text/plain
+echo "\nGroup 9: Subdirectory installs, obfuscated paths, modes, multi-day quarantine & emit_http_response\n";
+$mock_home_url   = 'https://example.test/blog/';
+$mock_transients = [];
+$wpdb->rows      = [];
+$wpdb->insert_id = 0;
+$mock_options    = [
+	'crawler_labyrinth_enabled'               => '1',
+	'crawler_labyrinth_route_prefix'          => 'feedback',
+	'crawler_labyrinth_mode'                  => 'labyrinth',
+	'crawler_labyrinth_response_format'       => 'html',
+	'crawler_labyrinth_max_depth'             => 4,
+	'crawler_labyrinth_strike_threshold'      => 2,
+	'crawler_labyrinth_block_ttl_minutes'     => 10080,
+	'crawler_labyrinth_block_status'          => 403,
+	'crawler_labyrinth_intercept_training_ua' => '1',
+	'crawler_labyrinth_hmac_secret'           => $secret,
+	'crawler_labyrinth_schema_version'        => Activator::SCHEMA_VERSION,
+];
+$router = new TrapRouter();
+assert_test(
+	'Settings::base_path() normalizes /blog/ subdirectory URL',
+	'/blog' === Settings::base_path()
+);
+$sub_trap    = $router->handle_request( '/blog/feedback/1-seedalpha1-0000/', 'BadBot/1.0', '198.51.100.31', false );
+$sub_feed    = $router->handle_request( '/blog/feed/', 'BadBot/1.0', '198.51.100.31', false );
+$other_app   = $router->handle_request( '/feedback/1-seedalpha1-0000/', 'BadBot/1.0', '198.51.100.31', false );
+$sub_decoy_2 = $router->handle_request( '/blog/index.php/%66eedback//1-seedalpha1-0000/', 'BadBot/1.0', '198.51.100.31', false );
+$sub_decoy_3 = $router->handle_request( '//blog///Feedback/', 'BadBot/1.0', '198.51.100.31', false );
+$sub_robots  = RobotsInjector::inject( "User-agent: BadBot\n\nUser-agent: OAI-SearchBot # inline\r\nAllow: /\r\nDisallow: /blog/feedback/ # note\r\nSitemap: https://example.test/sitemap.xml\r\n", 'feedback' );
+assert_test(
+	'Subdirectory /blog/ handles valid "feedback" trap, spares /blog/feed/, ignores non-/blog paths, decodes obfuscated paths, and never quarantines in labyrinth mode',
+	true === $sub_trap['handled']
+		&& 200 === $sub_trap['status']
+		&& str_contains( $sub_trap['body'], 'href="/blog/feedback/' )
+		&& false === $sub_feed['handled']
+		&& false === $other_app['handled']
+		&& true === $sub_decoy_2['handled']
+		&& 200 === $sub_decoy_2['status']
+		&& true === $sub_decoy_3['handled']
+		&& 200 === $sub_decoy_3['status']
+		&& 'root' === ( $mock_last_action_args['crawler_labyrinth_trap_triggered'][1] ?? '' )
+		&& ! str_contains( (string) ( $mock_last_action_args['crawler_labyrinth_trap_triggered'][3] ?? '' ), '198.51.100' )
+);
+assert_test(
+	'RobotsInjector flushes empty User-agent blocks, respects inline # comments, preserves CRLF, and honors subdir base_path',
+	str_contains( $sub_robots, "User-agent: BadBot\r\nDisallow: /blog/feedback/\r\n" )
+		&& 2 === substr_count( $sub_robots, 'Disallow: /blog/feedback/' )
+		&& str_contains( ( new RobotsInjector() )->filter_robots_txt( "User-agent: *\nAllow: /\n", '1' ), 'Disallow: /blog/feedback/' )
+);
+
+// Reset home_url and verify 403 block_status, block mode, maxDepth reject, DecoyGenerator prefix sanitization, HEAD & text/plain
+$mock_home_url = 'https://example.test/';
+$mock_options['crawler_labyrinth_route_prefix']  = 'crawler-trap';
+$mock_options['crawler_labyrinth_mode']          = 'block';
+$mock_options['crawler_labyrinth_block_status']  = 403;
+$mock_transients                                 = [];
+$r_403 = $router->handle_request( '/crawler-trap/1-seedalpha1-0000/', 'BlockBot/1.0', '198.51.100.41', false );
+assert_test(
+	'Block mode + 403 emits HTTP 403 without Retry-After header',
+	true === $r_403['handled'] && 403 === $r_403['status'] && ! isset( $r_403['headers']['Retry-After'] )
+);
+
+// Simulate multi-day rollover where yesterday's digest was quarantined for 7 days
+$mock_transients   = [];
+$yesterday_digest  = TokenSigner::ip_digest( '198.51.100.44', gmdate( 'Y-m-d', time() - 86400 ), $secret );
+$yesterday_q_key   = 'crawler_labyrinth_q_' . substr( $yesterday_digest, 0, 24 );
+$mock_transients[ $yesterday_q_key ]             = [ 'until' => time() + 7200, 'strikes' => 9 ];
+$mock_options['crawler_labyrinth_active_quarantine_max'] = time() + 7200;
+$r_rollover = $router->handle_request( '/normal-page/', 'RolloverBot/1.0', '198.51.100.44', false );
+assert_test(
+	'Multi-day quarantine persists across UTC day rollover',
+	true === $r_rollover['handled'] && 403 === $r_rollover['status'] && 9 === $r_rollover['strikes']
+);
+
+// DecoyGenerator sanitizes malicious & reserved route_prefix even in plain mode & aligns empty seed padding; depth > max_depth rejected in TrapRouter
+$xss_decoy      = $gen->generate( 2, '', 'plain', '/"onclick="alert(1)/', 4, 2, $secret );
+$reserved_decoy = $gen->generate( 2, 'ab', 'plain', 'wp-admin', 4, 2, $secret );
+$forged_d       = TokenSigner::sign( 16, 'forgedseed1', $secret );
+$mock_transients = [];
+$mock_options['crawler_labyrinth_mode']          = 'labyrinth';
+$mock_options['crawler_labyrinth_max_depth']     = 4;
+$mock_options['crawler_labyrinth_active_quarantine_max'] = 0;
+$r_overdepth  = $router->handle_request( '/crawler-trap/' . $forged_d . '/', 'BadBot/1.0', '198.51.100.92', false );
+$r_feedback_ua = $router->handle_request( '/feedback', 'GPTBot/1.2', '198.51.100.93', false );
+$r_feed_ua     = $router->handle_request( '/feed/', 'GPTBot/1.2', '198.51.100.94', false );
+assert_test(
+	'DecoyGenerator sanitizes routePrefix in plain mode, aligns short/empty seed padding, TrapRouter rejects forged depth > max_depth, and segment-bounded exclusions trap /feedback while sparing /feed/',
+	str_contains( $xss_decoy['body'], '- /onclickalert1/' )
+		&& str_contains( $reserved_decoy['body'], '- /crawler-trap/' )
+		&& ! str_contains( $xss_decoy['body'], 'onclick=' )
+		&& ! str_contains( $xss_decoy['body'], '"' )
+		&& 'archroot0001' === $xss_decoy['seed']
+		&& 'abarch0001' === $reserved_decoy['seed']
+		&& str_contains( $r_overdepth['body'], '(Section 1)' )
+		&& true === $r_feedback_ua['handled']
+		&& false === $r_feed_ua['handled']
+);
+
+// Reflection test on emit_http_response for HEAD (empty body) and text/plain (unescaped &)
+$emit_ref = new ReflectionMethod( TrapRouter::class, 'emit_http_response' );
+$_SERVER['REQUEST_METHOD'] = 'HEAD';
+ob_start();
+$emit_ref->invoke( $router, [ 'status' => 200, 'headers' => [ 'Content-Type' => 'text/html; charset=utf-8' ], 'body' => '<p>Body</p>' ] );
+$head_out = (string) ob_get_clean();
+$_SERVER['REQUEST_METHOD'] = 'GET';
+ob_start();
+$emit_ref->invoke( $router, [ 'status' => 200, 'headers' => [ 'Content-Type' => 'text/plain; charset=utf-8' ], 'body' => "A & B <raw>\n" ] );
+$plain_out = (string) ob_get_clean();
+assert_test(
+	'emit_http_response suppresses body on HEAD and emits unescaped text/plain body',
+	'' === $head_out && "A & B <raw>\n" === $plain_out
+);
+
+// Group 10: Activator zero-query steady state, HitLogger advisory lock, >500 keyset chain, prev_hash tamper, multi-batch retention & expired transients
+echo "\nGroup 10: Activator query caching, HitLogger locking, keyset pagination & multi-batch retention\n";
+$wpdb->show_tables_queries = 0;
+$mock_options['crawler_labyrinth_schema_version'] = Activator::SCHEMA_VERSION;
+Activator::ensure_ready();
+assert_test(
+	'Activator::ensure_ready executes zero SHOW TABLES LIKE queries once schema is current',
+	0 === $wpdb->show_tables_queries
+);
+
+$wpdb->rows         = [];
+$wpdb->insert_id    = 0;
+$wpdb->lock_calls   = 0;
+$wpdb->unlock_calls = 0;
+$logger             = new HitLogger();
+$batch_old          = gmdate( 'Y-m-d H:i:s', time() - ( 40 * DAY_IN_SECONDS ) );
+for ( $i = 0; $i < 250; $i++ ) {
+	$logger->record( $d1, TokenSigner::ua_digest( 'Bot/' . $i, $secret ), 'Bot/' . $i, '1-seed' . $i, 'decoy_served', '{}', $batch_old );
+}
+for ( $i = 0; $i < 265; $i++ ) {
+	$logger->record( $d2, TokenSigner::ua_digest( 'Fresh/' . $i, $secret ), 'Fresh/' . $i, '1-new' . $i, 'decoy_served', '{}', $new_date );
+}
+assert_test(
+	'HitLogger::record acquires and releases MySQL GET_LOCK around chain appends',
+	$wpdb->lock_calls === 515 && $wpdb->unlock_calls === 515
+);
+$wpdb->lock_timeout = true;
+$locked_fail_id     = $logger->record( $d1, $d2, 'LockedBot', '1-lock', 'decoy_served' );
+$wpdb->lock_timeout = false;
+assert_test(
+	'HitLogger::record aborts cleanly (returns 0) on GET_LOCK timeout',
+	0 === $locked_fail_id
+);
+
+$big_chain = $logger->verify_chain();
+assert_test(
+	'HitLogger::verify_chain verifies >500 rows cleanly via keyset pagination',
+	true === $big_chain['valid'] && 515 === $big_chain['total_verified'],
+	var_export( $big_chain, true )
+);
+
+// Corrupt prev_hash linkage while keeping row_hash internally consistent with corrupted prev_hash
+$orig_prev_2               = $wpdb->rows[2]->prev_hash;
+$orig_hash_2               = $wpdb->rows[2]->row_hash;
+$wpdb->rows[2]->prev_hash  = str_repeat( 'f', 64 );
+$wpdb->rows[2]->row_hash   = HitLogger::compute_full_hash(
+	$wpdb->rows[2]->created_at,
+	$wpdb->rows[2]->ip_digest,
+	$wpdb->rows[2]->ua_digest,
+	$wpdb->rows[2]->user_agent_excerpt,
+	$wpdb->rows[2]->route_token,
+	$wpdb->rows[2]->action_taken,
+	$wpdb->rows[2]->meta_json,
+	$wpdb->rows[2]->prev_hash,
+	$secret
+);
+$broken_link = $logger->verify_chain();
+assert_test(
+	'HitLogger::verify_chain rejects broken prev_hash linkage even when row_hash matches the fake prev_hash',
+	false === $broken_link['valid'] && 2 === $broken_link['broken_at_id']
+);
+$wpdb->rows[2]->prev_hash = $orig_prev_2;
+$wpdb->rows[2]->row_hash  = $orig_hash_2;
+
+// Test purge_expired aborts if record() fails (insert_fail = true) BEFORE touching user_agent_excerpt
+$wpdb->insert_fail = true;
+$aborted_purge     = $logger->purge_expired( false, 30 );
+$wpdb->insert_fail = false;
+$chain_after_abort = $logger->verify_chain();
+assert_test(
+	'purge_expired aborts without mutating rows when retention audit record insert fails',
+	0 === $aborted_purge['pseudonymized']
+		&& 'Bot/0' === $wpdb->rows[1]->user_agent_excerpt
+		&& true === $chain_after_abort['valid']
+);
+
+// Multi-batch purge (>200 rows -> 250 expired rows) + expired transient cleanup
+$mock_transients = [
+	'crawler_labyrinth_q_expired1'           => [ 'until' => 100 ],
+	'__timeout_crawler_labyrinth_q_expired1' => time() - 600,
+	'crawler_labyrinth_q_live1'              => [ 'until' => time() + 3600 ],
+	'__timeout_crawler_labyrinth_q_live1'    => time() + 3600,
+];
+$multi_purge = $logger->purge_expired( false, 30 );
+$post_purge  = $logger->verify_chain();
+assert_test(
+	'purge_expired processes >200 rows across batches, deletes expired transients, and preserves HMAC chain',
+	250 === $multi_purge['pseudonymized']
+		&& HitLogger::REDACTED_MARKER === $wpdb->rows[1]->user_agent_excerpt
+		&& HitLogger::REDACTED_MARKER === $wpdb->rows[250]->user_agent_excerpt
+		&& 'Fresh/0' === $wpdb->rows[251]->user_agent_excerpt
+		&& ! isset( $mock_transients['crawler_labyrinth_q_expired1'] )
+		&& isset( $mock_transients['crawler_labyrinth_q_live1'] )
+		&& true === $post_purge['valid']
+);
+
+// Group 11: AdminDashboard security guards, XSS escaping, non-telemetry chain skip & WP-CLI --no-dry-run
+echo "\nGroup 11: AdminDashboard guards, XSS escaping, REST route metadata & WP-CLI purge\n";
+$mock_options['crawler_labyrinth_enabled']      = '1';
+$mock_options['crawler_labyrinth_route_prefix'] = 'crawler-trap';
+$_POST = [
+	'crawler_labyrinth_save_nonce'   => 'bad-nonce',
+	'crawler_labyrinth_form'         => 'settings',
+	'crawler_labyrinth_route_prefix' => 'hacked-prefix',
+];
+try {
+	AdminDashboard::instance()->save_settings();
+} catch ( Crawler_Labyrinth_Test_Redirect $e ) {
+	unset( $e );
+}
+assert_test(
+	'save_settings rejects invalid nonce without changing options',
+	'1' === $mock_options['crawler_labyrinth_enabled']
+		&& 'crawler-trap' === $mock_options['crawler_labyrinth_route_prefix']
+);
+$mock_user_caps['manage_options'] = false;
+$_POST['crawler_labyrinth_save_nonce'] = 'valid-nonce-crawler_labyrinth_save_action';
+try {
+	AdminDashboard::instance()->save_settings();
+} catch ( Crawler_Labyrinth_Test_Redirect $e ) {
+	unset( $e );
+}
+$mock_user_caps['manage_options'] = true;
+assert_test(
+	'save_settings rejects callers lacking manage_options capability',
+	'1' === $mock_options['crawler_labyrinth_enabled']
+		&& 'crawler-trap' === $mock_options['crawler_labyrinth_route_prefix']
+);
+$_POST = [];
+
+// Render dashboard telemetry with XSS payload and settings tab without unpaginated chain verify
+$wpdb->rows = [
+	(object) [
+		'id'                 => 1,
+		'created_at'         => $new_date,
+		'action_taken'       => 'decoy_served',
+		'ip_digest'          => str_repeat( 'a', 64 ),
+		'route_token'        => '1-test',
+		'user_agent_excerpt' => '<script>alert(1)</script>',
+	],
+];
+$_GET = [ 'tab' => 'telemetry', 'updated' => 'purged' ];
+ob_start();
+AdminDashboard::instance()->render_dashboard();
+$telemetry_html = (string) ob_get_clean();
+$wpdb->chain_select_queries = 0;
+$_GET = [ 'tab' => 'settings', 'updated' => 'settings', 'prefix_fallback' => '1' ];
+ob_start();
+AdminDashboard::instance()->render_dashboard();
+$settings_html = (string) ob_get_clean();
+$_GET = [];
+assert_test(
+	'AdminDashboard escapes user_agent_excerpt XSS, uses unique form nonce IDs, adds table ARIA region, and skips full verify_chain on settings tab',
+	str_contains( $telemetry_html, '&lt;script&gt;alert(1)&lt;/script&gt;' )
+		&& ! str_contains( $telemetry_html, '<script>alert(1)</script>' )
+		&& str_contains( $telemetry_html, 'name="crawler_labyrinth_purge_nonce"' )
+		&& str_contains( $telemetry_html, 'name="crawler_labyrinth_lifecycle_nonce"' )
+		&& ! str_contains( $telemetry_html, 'id="crawler_labyrinth_save_nonce"' )
+		&& str_contains( $telemetry_html, 'role="region" aria-labelledby="cl-telemetry-heading" tabindex="0"' )
+		&& str_contains( $telemetry_html, '<table class="widefat striped" aria-labelledby="cl-telemetry-heading">' )
+		&& 0 === $wpdb->chain_select_queries
+		&& str_contains( $settings_html, 'reverted to' )
+);
+
+// REST route permission_callback + strict argument validators & response_format fallback
+$GLOBALS['mock_rest_routes'] = [];
+$rest->register_routes();
+$all_routes_admin_gated = true;
+foreach ( [ 'crawler-labyrinth/v1/status', 'crawler-labyrinth/v1/preview', 'crawler-labyrinth/v1/verify-chain' ] as $rname ) {
+	$cb = $GLOBALS['mock_rest_routes'][ $rname ]['permission_callback'] ?? null;
+	if ( ! is_array( $cb ) || 'check_admin_permission' !== ( $cb[1] ?? '' ) ) {
+		$all_routes_admin_gated = false;
+	}
+}
+$preview_args = $GLOBALS['mock_rest_routes']['crawler-labyrinth/v1/preview']['args'];
+$mock_options['crawler_labyrinth_response_format'] = 'plain';
+$fallback_preview = $rest->handle_preview( new WP_REST_Request( [] ) );
+assert_test(
+	'REST routes gate manage_options strictly, reject float/scientific depth and newline seed, and respect response_format fallback',
+	$all_routes_admin_gated
+		&& ! array_key_exists( 'default', $preview_args['format'] )
+		&& true === ( $preview_args['depth']['validate_callback'] )( '12' )
+		&& false === ( $preview_args['depth']['validate_callback'] )( '1.9' )
+		&& false === ( $preview_args['depth']['validate_callback'] )( '1e1' )
+		&& false === ( $preview_args['seed']['validate_callback'] )( "arch123\n" )
+		&& 'text/plain; charset=utf-8' === $fallback_preview->get_data()['data']['content_type']
+);
+
+// WP-CLI purge_expired --no-dry-run (`['dry-run' => false]`) runs real purge
+$wpdb->rows      = [];
+$wpdb->insert_id = 0;
+$logger->record( $d1, $d2, 'CliOldBot/1', '1-cli', 'decoy_served', '{}', $batch_old );
+$cli_cmd = new LabyrinthCommand();
+$cli_cmd->purge_expired( [], [ 'dry-run' => false ] );
+assert_test(
+	'LabyrinthCommand::purge_expired honors --no-dry-run (dry-run => false)',
+	HitLogger::REDACTED_MARKER === $wpdb->rows[1]->user_agent_excerpt
+);
+
+// Single-site & Multisite uninstall opt-in test
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	define( 'WP_UNINSTALL_PLUGIN', true );
 }
+$mock_is_multisite   = false;
+$mock_current_blog_id = 1;
 $mock_options        = [
 	'crawler_labyrinth_enabled'                  => '1',
 	'crawler_labyrinth_route_prefix'             => 'crawler-trap',
 	'crawler_labyrinth_delete_data_on_uninstall' => '0',
 	'crawler_labyrinth_hmac_secret'              => $secret,
 ];
-$wpdb->table_created = true;
-$wpdb->table_dropped = false;
+$wpdb->table_created  = true;
+$wpdb->table_dropped  = false;
+$wpdb->tables_dropped = [];
 require ABSPATH . 'uninstall.php';
 assert_test(
 	'uninstall.php preserves options and table by default when delete_data_on_uninstall is 0',
@@ -846,6 +1352,136 @@ require ABSPATH . 'uninstall.php';
 assert_test(
 	'uninstall.php deletes all options, transients, and drops table when delete_data_on_uninstall is 1',
 	[] === $mock_options && [] === $mock_transients && true === $wpdb->table_dropped
+);
+
+// Multisite cleanup across subsite Blog 2
+$mock_is_multisite     = true;
+$mock_site_options     = [];
+$wpdb->tables_dropped  = [];
+$mock_options          = [ 'crawler_labyrinth_delete_data_on_uninstall' => '0', 'crawler_labyrinth_enabled' => '1' ];
+$mock_blog_options[2]  = [ 'crawler_labyrinth_delete_data_on_uninstall' => '1', 'crawler_labyrinth_enabled' => '1' ];
+require ABSPATH . 'uninstall.php';
+$mock_is_multisite     = false;
+assert_test(
+	'uninstall.php iterates Multisite blogs and cleans opted-in subsites while sparing non-opted blogs',
+	'1' === ( $mock_options['crawler_labyrinth_enabled'] ?? '' )
+		&& [] === ( $mock_blog_options[2] ?? [] )
+		&& true === ( $wpdb->tables_dropped['wp_2_crawler_labyrinth_hits'] ?? false )
+		&& ! isset( $wpdb->tables_dropped['wp_crawler_labyrinth_hits'] )
+);
+
+// Group 12: Round 2 parity, cache-race, UTF-8 truncation, fallback routing & all extra mutant guards
+echo "\nGroup 12: Cache race, UTF-8 truncation, unknown tab clamp, and strict invariant pins\n";
+
+// 1. TokenSigner::ensure_secret notoptions cache race + client_ip ignores XFF + verify depth bounds + uppercase seed & mapped IPv6 parity
+unset( $mock_options[ TokenSigner::SECRET_OPTION ] );
+$mock_notoptions_poisoned   = true;
+$mock_simulate_race_secret  = str_repeat( 'e', 64 );
+$resolved_race_secret       = TokenSigner::ensure_secret();
+$mock_notoptions_poisoned   = false;
+$mock_simulate_race_secret  = '';
+$mock_options[ TokenSigner::SECRET_OPTION ] = $secret;
+$_SERVER['REMOTE_ADDR']          = '192.0.2.10';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.99';
+$client_ip_out                   = TokenSigner::client_ip();
+unset( $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_FORWARDED_FOR'] );
+$depth17_mac = substr( hash_hmac( 'sha256', '17|seedalpha1', $secret ), 0, 16 );
+$tok_depth17 = '17-seedalpha1-' . $depth17_mac;
+assert_test(
+	'TokenSigner clears notoptions cache on add_option race, ignores X-Forwarded-For, bounds depth 1..16, and aligns uppercase seed & mapped IPv6 parity',
+	str_repeat( 'e', 64 ) === $resolved_race_secret
+		&& '192.0.2.10' === $client_ip_out
+		&& null === TokenSigner::verify( $tok_depth17, $secret )
+		&& str_starts_with( TokenSigner::sign( 2, 'SeedAlpha9', $secret ), '2-seedalpha9-' )
+		&& 'seedalpha9' === $gen->generate( 2, 'SeedAlpha9', 'html', 'crawler-trap', 4, 2, $secret )['seed']
+		&& '198.51.100.7' === TokenSigner::normalize_ip( '0:0:0:0:0:ffff:198.51.100.7' )
+		&& '198.51.100.7' === TokenSigner::normalize_ip( '::ffff:c633:6407' )
+		&& 'fe80::1' === TokenSigner::normalize_ip( '[fe80::1%eth0]:443' )
+		&& 'crawler-trap' === Settings::sanitize_route_prefix( str_repeat( 'a', 33 ) )
+		&& false === ( $preview_args['depth']['validate_callback'] )( "12\n" )
+);
+
+// 2. RobotsInjector places Disallow above trailing # comments before blank lines and preserves RFC 9309 path case
+$robots_comment_blank = RobotsInjector::inject( "User-agent: Foo\nAllow: /\n# trailing note\n\nUser-agent: *\nAllow: /\n", 'crawler-trap' );
+$robots_mixed_case    = RobotsInjector::inject( "User-agent: *\nDisallow: /My-Trap/\n", 'my-trap' );
+$robots_case_field    = RobotsInjector::inject( "User-agent: Foo\nAllow: /\nDISALLOW:/crawler-trap/\n", 'crawler-trap' );
+assert_test(
+	'RobotsInjector inserts Disallow above trailing # comments and treats path matching case-sensitively per RFC 9309',
+	str_contains( $robots_comment_blank, "Allow: /\nDisallow: /crawler-trap/\n# trailing note\n" )
+		&& str_contains( $robots_mixed_case, "Disallow: /My-Trap/\nDisallow: /my-trap/\n" )
+		&& ! str_contains( $robots_case_field, 'Disallow: /crawler-trap/' ),
+	$robots_mixed_case
+);
+
+// 3. TrapRouter kill switch, active_quarantine_max persistence, and d >= 2..7 lookback rollover
+$mock_transients = [];
+$mock_options['crawler_labyrinth_enabled']               = '0';
+$mock_options['crawler_labyrinth_active_quarantine_max'] = 0;
+$disabled_hit = $router->handle_request( '/crawler-trap/1-seedalpha1-0000/', 'GPTBot/1.2', '198.51.100.12', false );
+$mock_options['crawler_labyrinth_enabled']               = '1';
+$mock_options['crawler_labyrinth_mode']                  = 'block';
+$mock_options['crawler_labyrinth_block_ttl_minutes']     = 10080;
+$mock_options['crawler_labyrinth_block_status']          = 403;
+$block_max_hit = $router->handle_request( '/crawler-trap/1-seedalpha1-0000/', 'BadBot/1.0', '198.51.100.13', false );
+$d3_digest     = TokenSigner::ip_digest( '198.51.100.14', gmdate( 'Y-m-d', time() - ( 3 * 86400 ) ), $secret );
+$mock_transients[ 'crawler_labyrinth_q_' . substr( $d3_digest, 0, 24 ) ] = [ 'until' => time() + 3600, 'strikes' => 4 ];
+$d3_hit        = $router->handle_request( '/ordinary/', 'Rollover3/1.0', '198.51.100.14', false );
+assert_test(
+	'TrapRouter respects enabled kill switch, persists active_quarantine_max, and checks d=3 lookback within 7-day TTL',
+	false === $disabled_hit['handled']
+		&& true === $block_max_hit['handled']
+		&& (int) ( $mock_options['crawler_labyrinth_active_quarantine_max'] ?? 0 ) > time()
+		&& true === $d3_hit['handled']
+		&& 403 === $d3_hit['status']
+);
+
+// 4. HitLogger REDACTED_MARKER spoof guard, UTF-8 mb_substr truncation, and purge_expired skipping tampered rows
+$wpdb->rows      = [];
+$wpdb->insert_id = 0;
+$spoof_id        = $logger->record( $d1, $d2, HitLogger::REDACTED_MARKER, '1-spoof', 'decoy_served', '{}', $batch_old );
+$spoof_before    = $wpdb->rows[ $spoof_id ]->user_agent_excerpt;
+$utf8_ua         = str_repeat( 'a', 190 ) . '🦊trailing';
+$utf8_id         = $logger->record( $d1, $d2, $utf8_ua, '1-utf8', 'decoy_served', '{}', $new_date );
+$tamper_old_id   = $logger->record( $d1, $d2, 'TamperBot/1', '1-tamper', 'decoy_served', '{}', $batch_old );
+$wpdb->rows[ $tamper_old_id ]->route_token = 'tampered-before-purge';
+$tamper_skip_res = $logger->purge_expired( false, 30 );
+$utf8_chain      = $logger->verify_chain();
+assert_test(
+	'HitLogger filters literal [REDACTED] UA spoofs, truncates UTF-8 cleanly via mb_substr, and skips tampered rows during purge_expired',
+	'(filtered)' === $spoof_before
+		&& mb_check_encoding( $wpdb->rows[ $utf8_id ]->user_agent_excerpt, 'UTF-8' )
+		&& 191 === mb_strlen( $wpdb->rows[ $utf8_id ]->user_agent_excerpt, 'UTF-8' )
+		&& HitLogger::REDACTED_MARKER === $wpdb->rows[ $spoof_id ]->user_agent_excerpt
+		&& 'TamperBot/1' === $wpdb->rows[ $tamper_old_id ]->user_agent_excerpt
+		&& false === $utf8_chain['valid']
+		&& $tamper_old_id === $utf8_chain['broken_at_id']
+);
+
+// 5. AdminDashboard purge_now form POST + ?tab=unknown_tab fallback renders chain badge & rows
+$wpdb->rows      = [];
+$wpdb->insert_id = 0;
+$logger->record( $d1, $d2, 'PurgePostBot/1', '1-ppost', 'decoy_served', '{}', $batch_old );
+$_POST = [
+	'crawler_labyrinth_purge_nonce' => 'valid-nonce-crawler_labyrinth_save_action',
+	'crawler_labyrinth_form'        => 'purge_now',
+];
+try {
+	AdminDashboard::instance()->save_settings();
+} catch ( Crawler_Labyrinth_Test_Redirect $e ) {
+	unset( $e );
+}
+$_POST = [];
+$_GET  = [ 'tab' => 'unknown_tab_name' ];
+ob_start();
+AdminDashboard::instance()->render_dashboard();
+$unknown_tab_html = (string) ob_get_clean();
+$_GET             = [];
+assert_test(
+	'AdminDashboard purge_now executes retention and ?tab=unknown_tab renders Telemetry chain badge & rows cleanly',
+	HitLogger::REDACTED_MARKER === $wpdb->rows[1]->user_agent_excerpt
+		&& str_contains( $unknown_tab_html, 'HMAC CHAIN VALID' )
+		&& str_contains( $unknown_tab_html, '1-ppost' )
+		&& str_contains( $unknown_tab_html, '<hr class="wp-header-end" aria-hidden="true" />' )
 );
 
 echo "\n==============================================================================\n";

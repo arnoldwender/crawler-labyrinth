@@ -4,6 +4,17 @@ All notable changes to **Crawler Labyrinth** are documented in this file followi
 
 ---
 
+## [1.0.2] - 2026-11-19
+
+### Fixed
+- **Subdirectory Routing, IP Normalization & Cache-Race Hardening:** Added `Settings::base_path()` normalization and segment-bounded route exclusions, switched to `wp_parse_url()`, restricted client IP resolution to `REMOTE_ADDR` with `%zone` stripping, `inet_pton`/`inet_ntop` IPv6 canonicalization, and `::ffff:` IPv4 extraction, bounded route depth (`1..16`), suppressed `HEAD` bodies and `Retry-After` on `403` responses, and cleared `'options'`/`'notoptions'` object-cache entries during concurrent `TokenSigner::ensure_secret()` initialization.
+- **Locked Audit Chain & Multi-Batch Retention:** Serialized `HitLogger::record()` appends with MySQL `GET_LOCK`/`RELEASE_LOCK`, upgraded `verify_chain()` to keyset pagination validating `prev_hash` linkage and unauthorized `[REDACTED]` mutations, added `mb_substr(..., 0, 191, 'UTF-8')` truncation, and made `purge_expired()` iterate batches while deleting expired quarantine transients.
+- **RFC 9309 `robots.txt` & Generator Parity:** Preserved path case sensitivity in `RobotsInjector` (`normalize_rule_compare()`), placed `Disallow` directives before trailing `#` comments above blank lines, and aligned empty/uppercase seed canonicalization with `archroot0001`.
+- **Admin UI, A11y & Input Guards:** Enforced `.cl-admin .cl-input` selector specificity (`#64748b` border, `44px` height), `min-width: 0` / `overflow-wrap: anywhere` on `320px` viewports, `forced-colors: active` active tab border, `aria-hidden="true"` on `<hr class="wp-header-end">`, early `?tab=` fallback clamping before telemetry queries, and strict `\z` depth validation in `RestController`.
+
+### Changed
+- Expanded `tests/test-suite.php` to 54 standalone tests and `tests/mutations.php` to 39 mutation probes (`39/39 RED`), updated `.gitignore`, refreshed admin UI screenshots (`docs/images/wp-admin-{telemetry,settings,preview}.png`), and regenerated `languages/crawler-labyrinth.pot`.
+
 ## [1.0.1] - 2026-11-19
 
 ### Changed

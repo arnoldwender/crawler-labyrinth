@@ -102,7 +102,21 @@ final class Settings {
 			'crawler_labyrinth_delete_data_on_uninstall',
 			'crawler_labyrinth_hmac_secret',
 			'crawler_labyrinth_schema_version',
+			'crawler_labyrinth_active_quarantine_max',
 		];
+	}
+
+	/**
+	 * Normalized WordPress home URL base path (`''` for root installs, `'/blog'` for subdirs).
+	 */
+	public static function base_path(): string {
+		if ( ! function_exists( 'home_url' ) ) {
+			return '';
+		}
+		$home    = (string) home_url( '/' );
+		$path    = function_exists( 'wp_parse_url' ) ? (string) wp_parse_url( $home, PHP_URL_PATH ) : '';
+		$trimmed = trim( $path, '/' );
+		return '' === $trimmed ? '' : '/' . $trimmed;
 	}
 
 	/**

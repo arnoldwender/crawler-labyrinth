@@ -3,11 +3,11 @@
   "specVersion": "1.6",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-19T15:52:54Z",
+    "timestamp": "2026-11-19T17:22:49Z",
     "component": {
       "type": "application",
       "name": "crawler-labyrinth",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "Local deterministic crawler tarpit and RFC 9309 robots.txt honeypot with hybrid HTTP 429/403 quarantine, HMAC-chained audit logging, and privacy-preserving daily IP digests.",
       "supplier": {
         "name": "Arnold Wender",
@@ -22,11 +22,11 @@
           }
         }
       ],
-      "purl": "pkg:wordpress/crawler-labyrinth@1.0.1",
+      "purl": "pkg:wordpress/crawler-labyrinth@1.0.2",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "95b21814aeb85b3b58ffd371c826605c496281db35d2d273fa045e84ea755d7b"
+          "content": "aa0f93bf924beab3225265f1cfa62782ad9357cbec939c1a12ece19df5c0c989"
         }
       ]
     }

@@ -259,7 +259,13 @@ final class AdminDashboard {
 	 * Handle nonce-protected POST submissions. Each tab writes only its own fields.
 	 */
 	public function save_settings(): void {
-		$nonce = isset( $_POST['crawler_labyrinth_save_nonce'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_save_nonce'] ) ) : '';
+		if ( isset( $_POST['crawler_labyrinth_purge_nonce'] ) ) {
+			$nonce = sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_purge_nonce'] ) );
+		} elseif ( isset( $_POST['crawler_labyrinth_lifecycle_nonce'] ) ) {
+			$nonce = sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_lifecycle_nonce'] ) );
+		} else {
+			$nonce = isset( $_POST['crawler_labyrinth_save_nonce'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_save_nonce'] ) ) : '';
+		}
 		if ( '' === $nonce || ! wp_verify_nonce( $nonce, 'crawler_labyrinth_save_action' ) ) {
 			return;
 		}
@@ -269,11 +275,19 @@ final class AdminDashboard {
 
 		$form = isset( $_POST['crawler_labyrinth_form'] ) ? sanitize_key( wp_unslash( (string) $_POST['crawler_labyrinth_form'] ) ) : '';
 
-		$redirect_tab = 'telemetry';
+		$redirect_tab    = 'telemetry';
+		$updated_flag    = 'settings';
+		$prefix_fallback = false;
 		if ( 'settings' === $form ) {
-			$redirect_tab = 'settings';
+			$redirect_tab     = 'settings';
+			$updated_flag     = 'settings';
+			$raw_prefix       = isset( $_POST['crawler_labyrinth_route_prefix'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_route_prefix'] ) ) : Settings::DEFAULT_ROUTE_PREFIX;
+			$sanitized_prefix = Settings::sanitize_route_prefix( $raw_prefix );
+			$normalized_raw   = strtolower( trim( $raw_prefix, " \t\n\r\0\x0B/" ) );
+			$prefix_fallback  = '' !== $normalized_raw && $normalized_raw !== $sanitized_prefix && Settings::DEFAULT_ROUTE_PREFIX === $sanitized_prefix;
+
 			update_option( 'crawler_labyrinth_enabled', isset( $_POST['crawler_labyrinth_enabled'] ) ? '1' : '0' );
-			update_option( 'crawler_labyrinth_route_prefix', Settings::sanitize_route_prefix( isset( $_POST['crawler_labyrinth_route_prefix'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_route_prefix'] ) ) : Settings::DEFAULT_ROUTE_PREFIX ) );
+			update_option( 'crawler_labyrinth_route_prefix', $sanitized_prefix );
 			update_option( 'crawler_labyrinth_mode', Settings::sanitize_mode( isset( $_POST['crawler_labyrinth_mode'] ) ? sanitize_key( wp_unslash( (string) $_POST['crawler_labyrinth_mode'] ) ) : 'hybrid' ) );
 			update_option( 'crawler_labyrinth_response_format', Settings::sanitize_format( isset( $_POST['crawler_labyrinth_response_format'] ) ? sanitize_key( wp_unslash( (string) $_POST['crawler_labyrinth_response_format'] ) ) : 'html' ) );
 			update_option( 'crawler_labyrinth_link_count', Settings::clamp_int( isset( $_POST['crawler_labyrinth_link_count'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_link_count'] ) ) : '1', 1, 5, 1 ) );
@@ -287,21 +301,28 @@ final class AdminDashboard {
 			Activator::sync_schedule();
 		} elseif ( 'lifecycle' === $form ) {
 			$redirect_tab = 'telemetry';
+			$updated_flag = 'lifecycle';
 			update_option( 'crawler_labyrinth_delete_data_on_uninstall', isset( $_POST['crawler_labyrinth_delete_data_on_uninstall'] ) ? '1' : '0' );
 		} elseif ( 'purge_now' === $form ) {
 			$redirect_tab = 'telemetry';
+			$updated_flag = 'purged';
 			( new HitLogger() )->purge_expired( false );
 		} else {
 			return;
 		}
 
+		$query_args = [
+			'page'    => 'crawler-labyrinth',
+			'tab'     => $redirect_tab,
+			'updated' => $updated_flag,
+		];
+		if ( $prefix_fallback ) {
+			$query_args['prefix_fallback'] = '1';
+		}
+
 		wp_safe_redirect(
 			add_query_arg(
-				[
-					'page'    => 'crawler-labyrinth',
-					'tab'     => $redirect_tab,
-					'updated' => 'true',
-				],
+				$query_args,
 				admin_url( 'admin.php' )
 			)
 		);
@@ -312,12 +333,9 @@ final class AdminDashboard {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab routing and feedback flag.
 		$active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( (string) $_GET['tab'] ) ) : 'telemetry';
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only feedback flag.
-		$was_updated = isset( $_GET['updated'] ) && 'true' === sanitize_key( wp_unslash( (string) $_GET['updated'] ) );
-		$settings    = Settings::all();
-		$logger      = new HitLogger();
-		$stats       = $logger->get_stats();
-		$chain       = $logger->verify_chain();
-		$recent_rows = $logger->get_recent( 15 );
+		$updated_flag = isset( $_GET['updated'] ) ? sanitize_key( wp_unslash( (string) $_GET['updated'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only validation warning flag.
+		$prefix_fallback = isset( $_GET['prefix_fallback'] ) && '1' === sanitize_key( wp_unslash( (string) $_GET['prefix_fallback'] ) );
 
 		$tabs = [
 			'telemetry' => [
@@ -340,6 +358,21 @@ final class AdminDashboard {
 		if ( ! isset( $tabs[ $active_tab ] ) ) {
 			$active_tab = 'telemetry';
 		}
+
+		$settings    = Settings::all();
+		$logger      = new HitLogger();
+		$stats       = $logger->get_stats();
+		$chain       = 'telemetry' === $active_tab ? $logger->verify_chain() : null;
+		$recent_rows = 'telemetry' === $active_tab ? $logger->get_recent( 15 ) : [];
+
+		$notice_message = '';
+		if ( 'settings' === $updated_flag || 'true' === $updated_flag ) {
+			$notice_message = __( 'Labyrinth settings and retention schedule saved.', 'crawler-labyrinth' );
+		} elseif ( 'lifecycle' === $updated_flag ) {
+			$notice_message = __( 'Data lifecycle preference saved.', 'crawler-labyrinth' );
+		} elseif ( 'purged' === $updated_flag ) {
+			$notice_message = __( 'Pseudonymizing retention and expired transient cleanup completed.', 'crawler-labyrinth' );
+		}
 		?>
 		<div class="wrap cl-admin">
 			<header class="cl-header">
@@ -354,19 +387,27 @@ final class AdminDashboard {
 				</div>
 				<div class="cl-header-badges">
 					<span class="cl-badge cl-badge-info"><?php echo esc_html( strtoupper( (string) $settings['mode'] ) ); ?></span>
+					<?php if ( null !== $chain ) : ?>
 					<span class="cl-badge <?php echo $chain['valid'] ? 'cl-badge-ok' : 'cl-badge-danger'; ?>">
 						<?php echo $chain['valid'] ? esc_html__( 'HMAC CHAIN VALID', 'crawler-labyrinth' ) : esc_html__( 'HMAC CHAIN WARNING', 'crawler-labyrinth' ); ?>
 					</span>
+					<?php endif; ?>
 				</div>
 			</header>
+			<hr class="wp-header-end" aria-hidden="true" />
 
-			<?php if ( $was_updated ) : ?>
-			<div class="notice notice-success is-dismissible" role="status" aria-live="polite">
-				<p><?php esc_html_e( 'Settings and schedule updated.', 'crawler-labyrinth' ); ?></p>
+			<?php if ( '' !== $notice_message ) : ?>
+			<div class="notice notice-success is-dismissible cl-notice" role="status" aria-live="polite" tabindex="-1">
+				<p><?php echo esc_html( $notice_message ); ?></p>
+			</div>
+			<?php endif; ?>
+			<?php if ( $prefix_fallback ) : ?>
+			<div class="notice notice-warning is-dismissible cl-notice" role="status" aria-live="polite" tabindex="-1">
+				<p><?php esc_html_e( 'Invalid or reserved trap route prefix reverted to "crawler-trap".', 'crawler-labyrinth' ); ?></p>
 			</div>
 			<?php endif; ?>
 
-			<nav class="cl-nav-tabs" aria-label="<?php esc_attr_e( 'Crawler Labyrinth Navigation', 'crawler-labyrinth' ); ?>">
+			<nav class="cl-nav-tabs" aria-label="<?php esc_attr_e( 'Crawler Labyrinth Sections', 'crawler-labyrinth' ); ?>">
 				<?php foreach ( $tabs as $slug => $tab ) : ?>
 				<a href="<?php echo esc_url( add_query_arg( [ 'page' => 'crawler-labyrinth', 'tab' => $slug ], admin_url( 'admin.php' ) ) ); ?>" class="cl-tab-link <?php echo $active_tab === $slug ? 'is-active' : ''; ?>"<?php echo $active_tab === $slug ? ' aria-current="page"' : ''; ?>>
 					<span class="dashicons <?php echo esc_attr( $tab['icon'] ); ?>" aria-hidden="true"></span>
@@ -376,7 +417,7 @@ final class AdminDashboard {
 			</nav>
 
 			<?php if ( 'telemetry' === $active_tab ) : ?>
-			<section aria-labelledby="cl-telemetry-heading">
+			<section aria-label="<?php esc_attr_e( 'Telemetry Overview and Controls', 'crawler-labyrinth' ); ?>">
 				<div class="cl-grid-4">
 					<div class="cl-stat-card">
 						<span class="cl-stat-label"><?php esc_html_e( 'Honeypot Status', 'crawler-labyrinth' ); ?></span>
@@ -396,7 +437,7 @@ final class AdminDashboard {
 					<div class="cl-stat-card">
 						<span class="cl-stat-label"><?php esc_html_e( 'Unique IP Digests', 'crawler-labyrinth' ); ?></span>
 						<span class="cl-stat-value"><?php echo esc_html( (string) $stats['unique_ip_digests'] ); ?></span>
-						<span class="cl-stat-meta"><?php echo esc_html( (string) $chain['total_verified'] . ' ' . __( 'verified rows', 'crawler-labyrinth' ) ); ?></span>
+						<span class="cl-stat-meta"><?php echo esc_html( (string) ( null !== $chain ? $chain['total_verified'] : $stats['total_hits'] ) . ' ' . __( 'verified rows', 'crawler-labyrinth' ) ); ?></span>
 					</div>
 				</div>
 
@@ -405,8 +446,8 @@ final class AdminDashboard {
 					<?php if ( [] === $recent_rows ) : ?>
 					<p class="cl-subtitle"><?php esc_html_e( 'No trap hits have been recorded yet.', 'crawler-labyrinth' ); ?></p>
 					<?php else : ?>
-					<div class="cl-table-wrap">
-						<table class="widefat striped">
+					<div class="cl-table-wrap" role="region" aria-labelledby="cl-telemetry-heading" tabindex="0">
+						<table class="widefat striped" aria-labelledby="cl-telemetry-heading">
 							<thead>
 								<tr>
 									<th scope="col"><?php esc_html_e( 'ID', 'crawler-labyrinth' ); ?></th>
@@ -434,7 +475,7 @@ final class AdminDashboard {
 					<?php endif; ?>
 
 					<form method="post" action="">
-						<?php wp_nonce_field( 'crawler_labyrinth_save_action', 'crawler_labyrinth_save_nonce' ); ?>
+						<?php wp_nonce_field( 'crawler_labyrinth_save_action', 'crawler_labyrinth_purge_nonce' ); ?>
 						<input type="hidden" name="crawler_labyrinth_form" value="purge_now" />
 						<button type="submit" class="cl-btn cl-btn-secondary">
 							<?php esc_html_e( 'Run Pseudonymizing Retention Now', 'crawler-labyrinth' ); ?>
@@ -445,7 +486,7 @@ final class AdminDashboard {
 				<div class="cl-card">
 					<h2><?php esc_html_e( 'Data Lifecycle &amp; Uninstall', 'crawler-labyrinth' ); ?></h2>
 					<form method="post" action="">
-						<?php wp_nonce_field( 'crawler_labyrinth_save_action', 'crawler_labyrinth_save_nonce' ); ?>
+						<?php wp_nonce_field( 'crawler_labyrinth_save_action', 'crawler_labyrinth_lifecycle_nonce' ); ?>
 						<input type="hidden" name="crawler_labyrinth_form" value="lifecycle" />
 						<fieldset class="cl-fieldset">
 							<legend class="screen-reader-text"><?php esc_html_e( 'Data Lifecycle Options', 'crawler-labyrinth' ); ?></legend>
@@ -492,8 +533,9 @@ final class AdminDashboard {
 								</label>
 							</div>
 							<div class="cl-form-group">
-								<label for="cl-prefix"><?php esc_html_e( 'Trap Route Prefix (lowercase alphanumeric and hyphens, 3-32 chars)', 'crawler-labyrinth' ); ?></label>
-								<input type="text" id="cl-prefix" name="crawler_labyrinth_route_prefix" class="cl-input" value="<?php echo esc_attr( (string) $settings['route_prefix'] ); ?>" />
+								<label for="cl-prefix"><?php esc_html_e( 'Trap Route Prefix', 'crawler-labyrinth' ); ?></label>
+								<input type="text" id="cl-prefix" name="crawler_labyrinth_route_prefix" class="cl-input" aria-describedby="cl-prefix-hint" value="<?php echo esc_attr( (string) $settings['route_prefix'] ); ?>" />
+								<p id="cl-prefix-hint" class="cl-subtitle"><?php esc_html_e( 'Lowercase letters, numbers, and hyphens only (3-32 chars). Reserved WordPress paths fall back to crawler-trap.', 'crawler-labyrinth' ); ?></p>
 							</div>
 						</fieldset>
 
