@@ -40,6 +40,12 @@ Search engines that honor `robots.txt` are disallowed from `/<prefix>/` across e
 
 By default, options and `{prefix}crawler_labyrinth_hits` are preserved across deletion. Enable **Delete plugin options and audit log table on uninstall** on the Telemetry & Audit tab to purge everything on uninstall.
 
+== Screenshots ==
+
+1. Telemetry & Audit tab showing honeypot status, hit counters, HMAC chain validity badge, recent trapped requests with keyed IP digests, and retention controls.
+2. Trap Settings tab with RFC 9309 robots.txt toggle, opt-in training scraper filter, and hybrid quarantine threshold configuration.
+3. Decoy & robots.txt Preview tab inspecting generated synthetic HTML5 entries and multi-group Disallow injection.
+
 == Changelog ==
 
 = 1.0.0 =

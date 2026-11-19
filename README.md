@@ -1,11 +1,28 @@
-# Crawler Labyrinth
+<p align="center">
+  <img src="docs/images/banner.jpg" alt="Crawler Labyrinth — Deterministic Crawler Honeypot and Quarantine for WordPress" />
+</p>
 
-A local deterministic crawler tarpit and RFC 9309 `robots.txt` honeypot for WordPress, with hybrid HTTP `429`/`403` quarantine, an HMAC-chained audit log, and privacy-preserving daily IP digests.
+<h1 align="center">Crawler Labyrinth</h1>
 
-- **Author:** [Arnold Wender](https://arnoldwender.com)
-- **Repository:** [github.com/arnoldwender/crawler-labyrinth](https://github.com/arnoldwender/crawler-labyrinth)
-- **Requirements:** WordPress 6.4+ · PHP 8.2+
-- **License:** [GPLv2 or later](LICENSE)
+<p align="center">
+  <strong>Local deterministic crawler tarpit and RFC 9309 <code>robots.txt</code> honeypot for WordPress, with hybrid HTTP 429/403 quarantine, HMAC-chained audit logging, and privacy-preserving daily IP digests.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/arnoldwender/crawler-labyrinth/actions/workflows/ci.yml"><img src="https://github.com/arnoldwender/crawler-labyrinth/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv2%2B-38bdf8.svg" alt="License: GPLv2 or later" /></a>
+  <img src="https://img.shields.io/badge/WordPress-6.4%2B-21759b.svg" alt="WordPress 6.4+" />
+  <img src="https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg" alt="PHP 8.2+" />
+</p>
+
+| Field | Value |
+| --- | --- |
+| **Author** | [Arnold Wender](https://arnoldwender.com) |
+| **Repository** | [github.com/arnoldwender/crawler-labyrinth](https://github.com/arnoldwender/crawler-labyrinth) |
+| **Companion Astro Package** | [arnoldwender/astro-crawler-labyrinth](https://github.com/arnoldwender/astro-crawler-labyrinth) |
+| **Stack & Requirements** | WordPress 6.4+ · PHP 8.2+ · Pure PHP (no external proxy calls) |
+| **License** | [GPLv2 or later](LICENSE) |
+| **Local Verification** | `php tests/test-suite.php && php tests/test-css-tokens.php && bash tests/run-mutations.sh` |
 
 ---
 
@@ -20,6 +37,10 @@ Many crawler-tarpit snippets work by fetching and relaying third-party HTML from
 ---
 
 ## Architecture Overview
+
+<p align="center">
+  <img src="docs/images/architecture-flow.svg" alt="Crawler Labyrinth request routing architecture showing compliant search bots vs non-compliant scrapers" />
+</p>
 
 1. **RFC 9309 Multi-Group `robots.txt` Injection (`RobotsInjector`):** Injects `Disallow: /<prefix>/` into **every** `User-agent:` group (not only `User-agent: *`), preventing explicit `Allow: /` blocks for search or citation crawlers from shadowing the disallow rule.
 2. **Accessible-Inert Footer Bait (`BaitRenderer`):** Prints `<div hidden aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 links (`rel="nofollow noopener"`, `tabindex="-1"`, `aria-hidden="true"`) in `wp_footer` on unauthenticated public frontend responses only. Screen readers and keyboard tab order skip it automatically; logged-in users, feeds, previews, AJAX, and REST requests are excluded.
@@ -43,6 +64,34 @@ Many crawler-tarpit snippets work by fetching and relaying third-party HTML from
 3. Open **Crawler Labyrinth** in the WordPress Admin menu to inspect telemetry, test previews, or customize trap limits.
 
 > **Page Cache & Reverse Proxy Note:** If you use Varnish, Nginx FastCGI cache, or a full-page cache plugin, exclude your trap prefix (default `/crawler-trap/*`) from caching so PHP can count per-client strikes and emit `429`/`403` quarantine headers dynamically. See [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) for examples.
+
+---
+
+## Screenshots
+
+### Telemetry & Audit Dashboard
+
+Live `Telemetry & Audit` view displaying `HONEYPOT STATUS` (`Active`, `/crawler-trap/`), `DECOY PAGES SERVED`, `QUARANTINED REQUESTS`, `UNIQUE IP DIGESTS`, the `HYBRID` and `HMAC CHAIN VALID` badges, `Recent Crawler Trap Activity`, retention controls, and `Data Lifecycle & Uninstall`.
+
+<p align="center">
+  <img src="docs/images/wp-admin-telemetry.png" alt="Crawler Labyrinth Telemetry and Audit WordPress admin tab" />
+</p>
+
+### Trap Settings
+
+`Trap Settings` tab configuring `Activation & Routing` (including the opt-in AI training scraper toggle sparing search and citation bots, plus `Trap Route Prefix`) and `Defense Mode & Quarantine Limits`.
+
+<p align="center">
+  <img src="docs/images/wp-admin-settings.png" alt="Crawler Labyrinth Trap Settings WordPress admin tab" />
+</p>
+
+### Decoy & `robots.txt` Preview
+
+`Decoy & robots.txt Preview` tab inspecting a live `Sample Synthetic Archival Entry` (`Cartographic Index C188-8714 (Section 1)`) and the `RFC 9309 robots.txt Group Injection Preview`.
+
+<p align="center">
+  <img src="docs/images/wp-admin-preview.png" alt="Crawler Labyrinth Decoy and robots.txt Preview WordPress admin tab" />
+</p>
 
 ---
 
