@@ -15,7 +15,7 @@ Local deterministic crawler tarpit and RFC 9309 robots.txt honeypot with hybrid 
 Crawler Labyrinth defends WordPress sites against automated scrapers that ignore `robots.txt` directives, without external proxies, third-party APIs, or outbound HTTP latency.
 
 1. **RFC 9309 Multi-Group `robots.txt` Injection:** Automatically injects `Disallow: /<prefix>/` into every `User-agent:` group so explicit `Allow: /` rules for search or citation crawlers cannot shadow the disallow rule.
-2. **Accessible-Inert Footer Bait:** Prints `<div hidden aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 trap links carrying `rel="nofollow noopener"`, `tabindex="-1"`, and `aria-hidden="true"` on unauthenticated public frontend pages only.
+2. **Accessible-Inert Footer Bait:** Prints `<div hidden inert aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 trap links carrying `rel="nofollow noopener"`, `tabindex="-1"`, and `aria-hidden="true"` on unauthenticated public frontend pages only.
 3. **Deterministic Local Labyrinth & Hybrid Quarantine:** `DecoyGenerator` synthesizes archival cataloguing pages (`HTML5` or `text/plain`) using local HMAC-SHA256 derivation. In `hybrid` mode (default), scrapers receive bounded-depth decoy pages up to `crawler_labyrinth_strike_threshold` hits and are then quarantined with HTTP `429` (`Retry-After`) or `403` for `crawler_labyrinth_block_ttl_minutes`. Modes `labyrinth` and `block` are also available.
 4. **Search & Citation Crawler Exemptions:** Optional opt-in training-UA interception (`crawler_labyrinth_intercept_training_ua`) is disabled by default and strictly exempts search, citation, and preview bots (`Googlebot`, `Bingbot`, `Applebot`, `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `MistralAI-User`, `Slackbot`, `Storebot-Google`, `DuckDuckBot`).
 5. **Tamper-Evident Audit Chain & Privacy:** Hits are logged to `{prefix}crawler_labyrinth_hits` using daily rotating keyed HMAC-SHA256 IP digests (raw IPs are never persisted) chained with `prev_hash` / `row_hash`. Scheduled daily retention redacts expired `user_agent_excerpt` fields while keeping chain verification intact.
@@ -36,7 +36,7 @@ No. All decoy documents, link tokens, and IP digests are generated locally insid
 
 = Will search engines or screen readers follow the hidden link? =
 
-Search engines that honor `robots.txt` are disallowed from `/<prefix>/` across every `User-agent:` group, and decoy responses also include `X-Robots-Tag` and `<meta name="robots">` with `noindex, nofollow, noarchive, nosnippet, noai, noimageai`. Assistive technology and keyboard navigation skip `<div hidden aria-hidden="true">` with `tabindex="-1"`.
+Search engines that honor `robots.txt` are disallowed from `/<prefix>/` across every `User-agent:` group, and decoy responses also include `X-Robots-Tag` and `<meta name="robots">` with `noindex, nofollow, noarchive, nosnippet, noai, noimageai` alongside `DONOTCACHEPAGE`. Assistive technology and keyboard navigation skip `<div hidden inert aria-hidden="true">` with `tabindex="-1"`.
 
 = Are stored options and logs removed when uninstalling? =
 

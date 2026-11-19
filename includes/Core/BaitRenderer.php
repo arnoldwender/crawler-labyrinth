@@ -86,7 +86,7 @@ final class BaitRenderer {
 			$links[]   = '<a href="' . esc_url( $url ) . '" rel="nofollow noopener" tabindex="-1" aria-hidden="true">' . esc_html( $label ) . '</a>';
 		}
 
-		$html = '<div hidden aria-hidden="true" data-crawler-labyrinth="1">' . implode( ' ', $links ) . '</div>';
+		$html = '<div hidden inert aria-hidden="true" data-crawler-labyrinth="1">' . implode( ' ', $links ) . '</div>';
 
 		if ( function_exists( 'apply_filters' ) ) {
 			$html = (string) apply_filters( 'crawler_labyrinth_bait_html', $html, $prefix, $count );
@@ -104,6 +104,7 @@ final class BaitRenderer {
 		return [
 			'div' => [
 				'hidden'                 => true,
+				'inert'                  => true,
 				'aria-hidden'            => true,
 				'data-crawler-labyrinth' => true,
 			],

@@ -12,21 +12,21 @@
 
 ```
 robots_txt (priority 999)
-  └─ RobotsInjector::inject() adds Disallow: /<prefix>/ to every User-agent group
+  └─ RobotsInjector::inject() adds Disallow: <base_path>/<prefix>/ to every User-agent group
 
 wp_footer (priority 99, unauthenticated public HTML only)
-  └─ BaitRenderer::render_footer_bait() emits <div hidden aria-hidden="true" data-crawler-labyrinth="1">
+  └─ BaitRenderer::render_footer_bait() emits <div hidden inert aria-hidden="true" data-crawler-labyrinth="1">
 
 template_redirect (priority 1)
   └─ TrapRouter::handle_request()
-       ├─ Exclusions: disabled | manage_options | /wp-admin | /wp-login.php | /wp-json | /robots.txt | /.well-known | /sitemap | /feed
-       ├─ Quarantine transient hit (crawler_labyrinth_q_<ip_digest24>) -> HTTP 429 (+ Retry-After) or 403
+       ├─ Exclusions: disabled | manage_options | non-matching subdir base | /wp-admin | /wp-login.php | /wp-json | /robots.txt | /.well-known | /sitemap | /feed
+       ├─ Quarantine transient hit (crawler_labyrinth_q_<ip_digest24>, with multi-day UTC lookback) -> DONOTCACHEPAGE + HTTP 429 (+ Retry-After) or 403
        ├─ Route prefix match OR opt-in training UA match (sparing ALLOWED_SEARCH_UA_TOKENS)
        ├─ Increment strike transient (crawler_labyrinth_s_<ip_digest24>)
        ├─ mode == block OR (mode == hybrid && strikes > strike_threshold)
-       │    └─ Persist quarantine transient, append 'quarantined' audit row, return 429/403
+       │    └─ Persist quarantine transient, append advisory-locked 'quarantined' audit row, return 429/403
        └─ Else
-            └─ TokenSigner::verify() -> DecoyGenerator::generate(), append 'decoy_served' row, return 200 OK
+            └─ TokenSigner::verify() (depth <= max_depth) -> DecoyGenerator::generate(), append advisory-locked 'decoy_served' row, return 200 OK (empty body on HEAD)
 ```
 
 ---
@@ -72,10 +72,10 @@ Rather than deleting aged rows or silently breaking `prev_hash` links, `HitLogge
 
 1. Selects rows older than `crawler_labyrinth_retention_days` not yet redacted.
 2. Verifies each row's `v1` `row_hash` and computes a `redacted-v1` residual hash omitting `user_agent_excerpt`.
-3. Appends a `retention_pseudonymized` chain entry containing `{"residuals": {"<id>": "<residual_hex>"}}`.
-4. Updates expired rows to `user_agent_excerpt = '[REDACTED]'`.
+3. Appends an advisory-locked `retention_pseudonymized` chain entry containing `{"residuals": {"<id>": "<residual_hex>"}}`, aborting cleanly if chain insertion fails.
+4. Updates expired rows to `user_agent_excerpt = '[REDACTED]'` and purges expired transient rows across batches.
 
-`HitLogger::verify_chain()` fails if any row's `prev_hash` breaks, any active row fails `v1`, any redacted row lacks an authorized `retention_pseudonymized` anchor, or any non-excerpt column on a redacted row fails `redacted-v1`.
+`HitLogger::verify_chain()` verifies records via bounded keyset pagination (`id > $last_id`) and fails if any row's `prev_hash` breaks, any active row fails `v1`, any redacted row lacks an authorized `retention_pseudonymized` anchor, or any non-excerpt column on a redacted row fails `redacted-v1`.
 
 ---
 

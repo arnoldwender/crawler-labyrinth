@@ -58,19 +58,19 @@ final class TrapRouter {
 		}
 
 		$is_admin = function_exists( 'current_user_can' ) && current_user_can( 'manage_options' );
-		$uri      = isset( $_SERVER['REQUEST_URI'] ) && is_scalar( $_SERVER['REQUEST_URI'] )
-			? sanitize_text_field( wp_unslash( (string) $_SERVER['REQUEST_URI'] ) )
-			: '/';
-		$ua       = isset( $_SERVER['HTTP_USER_AGENT'] ) && is_scalar( $_SERVER['HTTP_USER_AGENT'] )
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- raw URI path is decoded and validated against strict route patterns; sanitize_text_field strips %xx octets.
+		$uri = isset( $_SERVER['REQUEST_URI'] ) && is_scalar( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( (string) $_SERVER['REQUEST_URI'] ) : '/';
+		$ua  = isset( $_SERVER['HTTP_USER_AGENT'] ) && is_scalar( $_SERVER['HTTP_USER_AGENT'] )
 			? sanitize_text_field( wp_unslash( (string) $_SERVER['HTTP_USER_AGENT'] ) )
 			: '';
-		$ip       = TokenSigner::client_ip();
+		$ip  = TokenSigner::client_ip();
 
 		$result = $this->handle_request( $uri, $ua, $ip, $is_admin );
 		if ( ! $result['handled'] ) {
 			return;
 		}
 
+		self::mark_uncacheable();
 		$this->emit_http_response( $result );
 		exit;
 	}
@@ -107,19 +107,49 @@ final class TrapRouter {
 			return $passthrough;
 		}
 
-		$path = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
-		if ( '' === $path ) {
-			$path = '/';
+		if ( 1 !== preg_match( '#^https?://#i', $request_uri ) ) {
+			$request_uri = '/' . ltrim( $request_uri, '/' );
+		}
+		$raw_path = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
+		$decoded  = rawurldecode( '' !== $raw_path ? $raw_path : '/' );
+		$path     = (string) preg_replace( '#/+#', '/', $decoded );
+		if ( '' === $path || '/' !== $path[0] ) {
+			$path = '/' . ltrim( $path, '/' );
 		}
 
-		foreach ( self::EXCLUDED_PREFIXES as $excluded ) {
-			if ( 0 === stripos( $path, $excluded ) ) {
+		$base_path = Settings::base_path();
+		if ( '' !== $base_path ) {
+			if ( $path === $base_path ) {
+				$path = '/';
+			} elseif ( str_starts_with( $path, $base_path . '/' ) ) {
+				$path = substr( $path, strlen( $base_path ) );
+			} else {
 				return $passthrough;
 			}
 		}
 
+		$lower_path = strtolower( $path );
+		if ( '/index.php' === $lower_path ) {
+			$path = '/';
+		} elseif ( str_starts_with( $lower_path, '/index.php/' ) ) {
+			$path = substr( $path, 10 );
+			if ( '' === $path ) {
+				$path = '/';
+			}
+		}
+
+		$prefix       = (string) $settings['route_prefix'];
+		$regex        = '#^/' . preg_quote( $prefix, '#' ) . '(?:/([a-zA-Z0-9_-]{1,96}))?/?$#i';
+		$trap_matched = 1 === preg_match( $regex, $path, $matches );
+
+		if ( ! $trap_matched && self::is_excluded_path( $path ) ) {
+			return $passthrough;
+		}
+
 		$secret    = TokenSigner::ensure_secret();
-		$ip_digest = TokenSigner::ip_digest( $client_ip, null, $secret );
+		$now       = time();
+		$utc_day   = gmdate( 'Y-m-d', $now );
+		$ip_digest = TokenSigner::ip_digest( $client_ip, $utc_day, $secret );
 		$ua_digest = TokenSigner::ua_digest( $user_agent, $secret );
 		$q_key     = 'crawler_labyrinth_q_' . substr( $ip_digest, 0, 24 );
 		$s_key     = 'crawler_labyrinth_s_' . substr( $ip_digest, 0, 24 );
@@ -127,25 +157,24 @@ final class TrapRouter {
 		$block_status = (int) $settings['block_status'];
 		$ttl_seconds  = (int) $settings['block_ttl_minutes'] * 60;
 
-		// Check existing quarantine state first.
-		$quarantined_until = function_exists( 'get_transient' ) ? get_transient( $q_key ) : false;
-		if ( false !== $quarantined_until && (int) $quarantined_until > time() ) {
-			$retry_after = max( 60, (int) $quarantined_until - time() );
-			return $this->build_block_response( $block_status, $retry_after, (int) $settings['strike_threshold'] );
+		// Check existing quarantine state first (including prior UTC days if TTL spans midnight).
+		$active_quarantine = $this->find_active_quarantine( $q_key, $client_ip, $secret, $ttl_seconds, $now );
+		if ( null !== $active_quarantine ) {
+			self::mark_uncacheable();
+			$retry_after = max( 60, $active_quarantine['until'] - $now );
+			return $this->build_block_response( $block_status, $retry_after, $active_quarantine['strikes'] );
 		}
 
-		$prefix = (string) $settings['route_prefix'];
-		$regex  = '#^/' . preg_quote( $prefix, '#' ) . '(?:/([a-zA-Z0-9_-]{1,96}))?/?$#';
-
-		$trap_matched = 1 === preg_match( $regex, $path, $matches );
-		$ua_matched   = ! $trap_matched && (bool) $settings['intercept_training_ua'] && Settings::is_training_only_ua( $user_agent );
+		$ua_matched = ! $trap_matched && (bool) $settings['intercept_training_ua'] && Settings::is_training_only_ua( $user_agent );
 
 		if ( ! $trap_matched && ! $ua_matched ) {
 			return $passthrough;
 		}
 
-		$raw_token = $trap_matched ? (string) ( $matches[1] ?? '' ) : 'ua-guard';
-		$strikes   = ( function_exists( 'get_transient' ) ? (int) get_transient( $s_key ) : 0 ) + 1;
+		self::mark_uncacheable();
+		$raw_token     = $trap_matched ? (string) ( $matches[1] ?? '' ) : 'ua-guard';
+		$token_for_log = '' !== $raw_token ? $raw_token : 'root';
+		$strikes       = ( function_exists( 'get_transient' ) ? (int) get_transient( $s_key ) : 0 ) + 1;
 		if ( function_exists( 'set_transient' ) ) {
 			set_transient( $s_key, $strikes, max( 300, $ttl_seconds ) );
 		}
@@ -156,21 +185,36 @@ final class TrapRouter {
 
 		$logger = new HitLogger();
 		if ( $quarantine ) {
+			$quarantine_until = $now + $ttl_seconds;
 			if ( function_exists( 'set_transient' ) ) {
-				set_transient( $q_key, time() + $ttl_seconds, $ttl_seconds );
+				set_transient(
+					$q_key,
+					[
+						'until'   => $quarantine_until,
+						'strikes' => $strikes,
+					],
+					$ttl_seconds
+				);
 			}
-			$logger->record( $ip_digest, $ua_digest, $user_agent, '' !== $raw_token ? $raw_token : 'root', 'quarantined' );
+			$prev_max = (int) get_option( 'crawler_labyrinth_active_quarantine_max', 0 );
+			if ( $quarantine_until > $prev_max ) {
+				update_option( 'crawler_labyrinth_active_quarantine_max', $quarantine_until, true );
+			}
+			$logger->record( $ip_digest, $ua_digest, $user_agent, $token_for_log, 'quarantined' );
 
 			if ( function_exists( 'do_action' ) ) {
-				do_action( 'crawler_labyrinth_trap_triggered', 'quarantined', $raw_token, $strikes, $ip_digest );
+				do_action( 'crawler_labyrinth_trap_triggered', 'quarantined', $token_for_log, $strikes, $ip_digest );
 			}
 
 			return $this->build_block_response( $block_status, $ttl_seconds, $strikes );
 		}
 
 		$parsed = '' !== $raw_token ? TokenSigner::verify( $raw_token, $secret ) : null;
-		$depth  = null !== $parsed ? $parsed['depth'] : 1;
-		$seed   = null !== $parsed
+		if ( null !== $parsed && $parsed['depth'] > (int) $settings['max_depth'] ) {
+			$parsed = null;
+		}
+		$depth = null !== $parsed ? $parsed['depth'] : 1;
+		$seed  = null !== $parsed
 			? $parsed['seed']
 			: substr( hash_hmac( 'sha256', 'entry|' . $path, $secret ), 0, 12 );
 
@@ -184,10 +228,10 @@ final class TrapRouter {
 			$secret
 		);
 
-		$logger->record( $ip_digest, $ua_digest, $user_agent, '' !== $raw_token ? $raw_token : 'root', 'decoy_served' );
+		$logger->record( $ip_digest, $ua_digest, $user_agent, $token_for_log, 'decoy_served' );
 
 		if ( function_exists( 'do_action' ) ) {
-			do_action( 'crawler_labyrinth_trap_triggered', 'decoy_served', $raw_token, $strikes, $ip_digest );
+			do_action( 'crawler_labyrinth_trap_triggered', 'decoy_served', $token_for_log, $strikes, $ip_digest );
 		}
 
 		return [
@@ -258,14 +302,112 @@ final class TrapRouter {
 			}
 		}
 
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) && is_scalar( $_SERVER['REQUEST_METHOD'] )
+			? strtoupper( sanitize_text_field( wp_unslash( (string) $_SERVER['REQUEST_METHOD'] ) ) )
+			: 'GET';
+		if ( 'HEAD' === $method ) {
+			return;
+		}
+
 		$content_type = $response['headers']['Content-Type'] ?? 'text/plain; charset=utf-8';
 		if ( str_starts_with( $content_type, 'text/plain' ) ) {
-			echo esc_html( $response['body'] );
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- plain-text response served strictly with Content-Type: text/plain and X-Content-Type-Options: nosniff.
+			echo $response['body'];
 			return;
 		}
 
 		echo "<!doctype html>\n";
 		echo wp_kses( $response['body'], self::decoy_allowed_html() );
+	}
+
+	private static function mark_uncacheable(): void {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- standard WordPress cache bypass constant for trapped requests.
+			define( 'DONOTCACHEPAGE', true );
+		}
+		if ( ! defined( 'DONOTCACHEDB' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- standard WordPress DB cache bypass constant for trapped requests.
+			define( 'DONOTCACHEDB', true );
+		}
+		if ( ! defined( 'DONOTCDN' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- standard WordPress CDN bypass constant for trapped requests.
+			define( 'DONOTCDN', true );
+		}
+	}
+
+	private static function is_excluded_path( string $path ): bool {
+		$lower = strtolower( $path );
+		foreach ( self::EXCLUDED_PREFIXES as $excluded ) {
+			if ( $lower === $excluded || str_starts_with( $lower, $excluded . '/' ) ) {
+				return true;
+			}
+			if ( ( '/sitemap' === $excluded || '/wp-sitemap' === $excluded )
+				&& str_starts_with( $lower, $excluded )
+				&& str_ends_with( $lower, '.xml' )
+			) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Resolve an active quarantine record for today's digest or recent UTC days within TTL.
+	 *
+	 * @return array{until: int, strikes: int}|null
+	 */
+	private function find_active_quarantine(
+		string $today_q_key,
+		string $client_ip,
+		string $secret,
+		int $ttl_seconds,
+		int $now
+	): ?array {
+		if ( ! function_exists( 'get_transient' ) ) {
+			return null;
+		}
+
+		$record = $this->parse_quarantine_transient( get_transient( $today_q_key ) );
+		if ( null !== $record && $record['until'] > $now ) {
+			return $record;
+		}
+
+		$max_active = (int) get_option( 'crawler_labyrinth_active_quarantine_max', 0 );
+		if ( $max_active <= $now ) {
+			return null;
+		}
+
+		$lookback_days = min( 7, max( 1, (int) ceil( $ttl_seconds / 86400 ) ) );
+		for ( $d = 1; $d <= $lookback_days; $d++ ) {
+			$past_day    = gmdate( 'Y-m-d', $now - ( $d * 86400 ) );
+			$past_digest = TokenSigner::ip_digest( $client_ip, $past_day, $secret );
+			$past_key    = 'crawler_labyrinth_q_' . substr( $past_digest, 0, 24 );
+			$past_rec    = $this->parse_quarantine_transient( get_transient( $past_key ) );
+			if ( null !== $past_rec && $past_rec['until'] > $now ) {
+				return $past_rec;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * @return array{until: int, strikes: int}|null
+	 */
+	private function parse_quarantine_transient( mixed $raw ): ?array {
+		if ( is_array( $raw ) && isset( $raw['until'] ) ) {
+			return [
+				'until'   => (int) $raw['until'],
+				'strikes' => max( 1, (int) ( $raw['strikes'] ?? 1 ) ),
+			];
+		}
+		if ( is_numeric( $raw ) ) {
+			return [
+				'until'   => (int) $raw,
+				'strikes' => 1,
+			];
+		}
+		return null;
 	}
 
 	/**

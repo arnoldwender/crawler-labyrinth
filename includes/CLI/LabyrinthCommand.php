@@ -80,7 +80,7 @@ final class LabyrinthCommand {
 		$settings = Settings::all();
 		$depth    = Settings::clamp_int( $assoc_args['depth'] ?? 1, 1, 16, 1 );
 		$seed_raw = (string) ( $assoc_args['seed'] ?? 'archpreview1' );
-		if ( 1 !== preg_match( '/^[a-z0-9]{4,24}$/i', $seed_raw ) ) {
+		if ( 1 !== preg_match( '/\A[a-z0-9]{4,24}\z/i', $seed_raw ) ) {
 			WP_CLI::error( 'Seed must be 4-24 alphanumeric characters.' );
 			return;
 		}
@@ -138,7 +138,9 @@ final class LabyrinthCommand {
 	 */
 	public function purge_expired( array $args, array $assoc_args ): void {
 		unset( $args );
-		$dry_run = isset( $assoc_args['dry-run'] );
+		$dry_run = function_exists( '\\WP_CLI\\Utils\\get_flag_value' )
+			? (bool) \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false )
+			: ! empty( $assoc_args['dry-run'] );
 		$res     = ( new HitLogger() )->purge_expired( $dry_run );
 		if ( $dry_run ) {
 			WP_CLI::success( sprintf( 'Dry run (cutoff %s): %d row(s) eligible for pseudonymization.', $res['cutoff'], $res['candidates'] ) );

@@ -22,7 +22,11 @@ final class Activator {
 	public const SCHEMA_VERSION = '1.0.0';
 
 	public static function activate(): void {
-		self::ensure_ready();
+		TokenSigner::ensure_secret();
+		if ( ! HitLogger::table_exists() ) {
+			HitLogger::create_table();
+		}
+		update_option( 'crawler_labyrinth_schema_version', self::SCHEMA_VERSION, true );
 		self::sync_schedule();
 	}
 
@@ -39,9 +43,11 @@ final class Activator {
 		TokenSigner::ensure_secret();
 
 		$stored_schema = (string) get_option( 'crawler_labyrinth_schema_version', '' );
-		if ( self::SCHEMA_VERSION !== $stored_schema || ! HitLogger::table_exists() ) {
-			HitLogger::create_table();
-			update_option( 'crawler_labyrinth_schema_version', self::SCHEMA_VERSION, false );
+		if ( self::SCHEMA_VERSION !== $stored_schema ) {
+			if ( ! HitLogger::table_exists() ) {
+				HitLogger::create_table();
+			}
+			update_option( 'crawler_labyrinth_schema_version', self::SCHEMA_VERSION, true );
 		}
 	}
 
