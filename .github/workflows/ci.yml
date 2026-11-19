@@ -1,0 +1,51 @@
+name: CI Test Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['8.2', '8.3', '8.4']
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: dom, mbstring, json, openssl, libxml, simplexml
+
+      - name: Run Unit & CSS Token Suites
+        run: |
+          php tests/test-suite.php
+          php tests/test-css-tokens.php
+
+      - name: Install WP-CLI
+        if: matrix.php-version == '8.3'
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -sSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o "$HOME/bin/wp"
+          chmod +x "$HOME/bin/wp"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Translation Catalog Freshness
+        if: matrix.php-version == '8.3'
+        run: php tests/test-pot-freshness.php
+
+      - name: Run Mutation Gate
+        if: matrix.php-version == '8.3'
+        run: bash tests/run-mutations.sh
+
+      - name: Run Static Security Audit
+        run: python3 .github/scripts/security-audit.py
+
+      - name: Verify CycloneDX SBOM Presence
+        run: test -f bom.json && echo "bom.json verified."

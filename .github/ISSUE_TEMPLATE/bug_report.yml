@@ -1,0 +1,27 @@
+name: Bug Report
+description: Report a defect in Crawler Labyrinth
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Description
+      description: Concise summary of the unexpected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Exact request path, configuration options, or WP-CLI / REST steps.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: WordPress version, PHP version, and web server / reverse proxy (Nginx, Apache, Cloudflare, Varnish).
+      placeholder: "WordPress 6.8, PHP 8.3, Nginx"
+    validations:
+      required: true
