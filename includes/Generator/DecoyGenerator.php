@@ -99,7 +99,7 @@ final class DecoyGenerator {
 		$bounded_depth = max( 1, min( 16, $depth ) );
 		$bounded_max   = max( 1, min( 16, $max_depth ) );
 		$clean_prefix  = Settings::sanitize_route_prefix( $route_prefix );
-		$clean_seed    = strtolower( (string) preg_replace( '/[^a-z0-9]/', '', $seed ) );
+		$clean_seed    = (string) preg_replace( '/[^a-z0-9]/', '', strtolower( $seed ) );
 		if ( '' === $clean_seed ) {
 			$clean_seed = 'archroot0001';
 		} elseif ( strlen( $clean_seed ) < 4 ) {

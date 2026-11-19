@@ -145,7 +145,8 @@ final class HitLogger {
 		$table     = self::table_name();
 		$secret    = TokenSigner::ensure_secret();
 		$timestamp = $created_at ?? gmdate( 'Y-m-d H:i:s' );
-		$excerpt   = substr( sanitize_text_field( $user_agent_excerpt ), 0, 191 );
+		$clean_ua  = sanitize_text_field( $user_agent_excerpt );
+		$excerpt   = function_exists( 'mb_substr' ) ? mb_substr( $clean_ua, 0, 191, 'UTF-8' ) : substr( $clean_ua, 0, 191 );
 		if ( self::REDACTED_MARKER === $excerpt && self::RETENTION_ACTION !== $action_taken ) {
 			$excerpt = '(filtered)';
 		}
