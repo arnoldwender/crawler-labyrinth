@@ -10,8 +10,6 @@
  * @package CrawlerLabyrinth
  */
 
-declare(strict_types=1);
-
 defined( 'ABSPATH' ) || exit;
 
 use CrawlerLabyrinth\Audit\HitLogger;
