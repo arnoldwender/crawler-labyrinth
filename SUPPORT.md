@@ -33,10 +33,11 @@ Submitting an issue or security advisory creates **no obligation, promise, or ti
 
 ---
 
-## 4. No Warranty & Zero Responsibility ("AS IS")
+## 4. No Warranty, Zero Responsibility ("AS IS") & No Legal Advice
 
 Pursuant to Sections 11 and 12 of the [GNU General Public License v2.0 (or later)](LICENSE):
 
 - This software is provided **"AS IS"**, without warranty of any kind, either expressed or implied, including, but not limited to, the implied warranties of merchantability and fitness for a particular purpose.
 - The author assumes **zero responsibility and zero liability** for any direct, indirect, incidental, special, exemplary, or consequential damages, data loss, site downtime, server load, reverse-proxy/caching misbehavior, search-engine/crawler indexing effects, false positives, legal claims, or operational outcomes arising from installing, modifying, or running this plugin.
-- You are solely responsible for testing, auditing, configuring, and monitoring the plugin in your own environment.
+- Logs, previews, audit chains, and `robots.txt` output included in this repository are software utilities only and **never constitute legal, security, or compliance advice**.
+- You are solely responsible for testing, auditing, configuring, legally verifying, and monitoring the plugin in your own environment.
