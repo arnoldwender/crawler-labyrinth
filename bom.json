@@ -7,7 +7,7 @@
     "component": {
       "type": "application",
       "name": "crawler-labyrinth",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "Local deterministic crawler tarpit and RFC 9309 robots.txt honeypot with hybrid HTTP 429/403 quarantine, HMAC-chained audit logging, and privacy-preserving daily IP digests.",
       "supplier": {
         "name": "Arnold Wender",
@@ -22,7 +22,7 @@
           }
         }
       ],
-      "purl": "pkg:wordpress/crawler-labyrinth@1.0.2",
+      "purl": "pkg:wordpress/crawler-labyrinth@1.0.3",
       "hashes": [
         {
           "alg": "SHA-256",

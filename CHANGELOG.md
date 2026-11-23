@@ -4,6 +4,11 @@ All notable changes to **Crawler Labyrinth** are documented in this file followi
 
 ---
 
+## [1.0.3] - 2026-11-23
+
+### Changed
+- `README.md` notes that the plugin was built with an agentic workflow; `SUPPORT.md` section 4 adds that logs, previews, audit chains and `robots.txt` output are not legal, security or compliance advice. No code changes.
+
 ## [1.0.2] - 2026-11-19
 
 ### Fixed
