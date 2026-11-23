@@ -3,7 +3,7 @@
  * Plugin Name:       Crawler Labyrinth
  * Plugin URI:        https://github.com/arnoldwender/crawler-labyrinth
  * Description:       Local deterministic crawler tarpit and RFC 9309 robots.txt honeypot with hybrid HTTP 429/403 quarantine, HMAC-chained audit logging, and privacy-preserving daily IP digests.
- * Version:           1.0.2
+ * Version:           1.0.3
  * Requires at least: 6.4
  * Tested up to:      7.1
  * Requires PHP:      8.2
@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CRAWLER_LABYRINTH_VERSION', '1.0.2' );
+define( 'CRAWLER_LABYRINTH_VERSION', '1.0.3' );
 define( 'CRAWLER_LABYRINTH_FILE', __FILE__ );
 define( 'CRAWLER_LABYRINTH_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CRAWLER_LABYRINTH_URL', plugin_dir_url( __FILE__ ) );

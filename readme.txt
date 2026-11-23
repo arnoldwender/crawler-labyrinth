@@ -4,7 +4,7 @@ Tags: security, robots, honeypot, crawler, tarpit
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -53,6 +53,9 @@ No. This plugin is provided with zero support (`0` support). Private inquiries v
 3. Decoy & robots.txt Preview tab inspecting generated synthetic HTML5 entries and multi-group Disallow injection.
 
 == Changelog ==
+
+= 1.0.3 =
+* Documentation only: README notes that the plugin was built with an agentic workflow, and SUPPORT.md states that logs, previews, audit chains and robots.txt output are not legal, security or compliance advice. No code changes.
 
 = 1.0.2 =
 * Security and request routing: hardened subdirectory (`base_path`) normalization and segment-bounded route exclusions, switched to `wp_parse_url()`, enforced remote IP parsing without trusting spoofable forwarding headers by default, bounded verified trap depth (`<= 16`), added HTTP `HEAD` empty-body responses, removed `Retry-After` from `403` responses, and cleared object-cache `notoptions` entries on concurrent HMAC secret initialization.
