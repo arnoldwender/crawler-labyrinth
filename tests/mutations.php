@@ -244,4 +244,22 @@ return [
 			[ 'includes/Core/RobotsInjector.php', '$value = trim( substr( $directive, $colon_pos + 1 ) );', '$value = strtolower( trim( substr( $directive, $colon_pos + 1 ) ) );' ],
 		],
 	],
+	[
+		'TrapRouter reverts early init hook back to late template_redirect',
+		[
+			[ 'includes/Core/TrapRouter.php', "add_action( 'init', [ \$this, 'intercept_request' ], 1 );", "add_action( 'template_redirect', [ \$this, 'intercept_request' ], 1 );" ],
+		],
+	],
+	[
+		'TrapRouter disables global burst circuit breaker',
+		[
+			[ 'includes/Core/TrapRouter.php', 'if ( $burst_limit > 0 && $this->is_burst_exceeded( $burst_limit, $now ) ) {', 'if ( false ) {' ],
+		],
+	],
+	[
+		'Settings::sanitize_mode rejects observe dry-run mode',
+		[
+			[ 'includes/Core/Settings.php', "return in_array( \$val, [ 'hybrid', 'labyrinth', 'block', 'observe' ], true ) ? \$val : 'hybrid';", "return in_array( \$val, [ 'hybrid', 'labyrinth', 'block' ], true ) ? \$val : 'hybrid';" ],
+		],
+	],
 ];

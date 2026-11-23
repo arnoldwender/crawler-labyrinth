@@ -45,10 +45,12 @@ final class LabyrinthCommand {
 		WP_CLI::line( 'Route prefix:     /' . (string) $settings['route_prefix'] . '/' );
 		WP_CLI::line( 'Response format:  ' . (string) $settings['response_format'] );
 		WP_CLI::line( 'Strike threshold: ' . (string) $settings['strike_threshold'] );
+		WP_CLI::line( 'Burst limit:      ' . ( 0 === (int) $settings['burst_limit'] ? 'unlimited' : (string) $settings['burst_limit'] . '/min' ) );
 		WP_CLI::line( 'Block status:     ' . (string) $settings['block_status'] );
 		WP_CLI::line( 'Cron scheduled:   ' . ( false !== $next ? gmdate( 'Y-m-d H:i:s', (int) $next ) . ' UTC' : 'no' ) );
 		WP_CLI::line( 'Total hits:       ' . (string) $stats['total_hits'] );
 		WP_CLI::line( 'Decoys served:    ' . (string) $stats['decoy_served'] );
+		WP_CLI::line( 'Observed hits:    ' . (string) ( $stats['observed'] ?? 0 ) );
 		WP_CLI::line( 'Quarantined hits: ' . (string) $stats['quarantined'] );
 	}
 

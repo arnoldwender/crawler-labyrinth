@@ -2,23 +2,23 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Crawler Labyrinth 1.0.3\n"
+"Project-Id-Version: Crawler Labyrinth 1.1.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/crawler-labyrinth\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-19T17:23:04+00:00\n"
+"POT-Creation-Date: 2026-11-23T14:49:54+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: crawler-labyrinth\n"
 
 #. Plugin Name of the plugin
 #: crawler-labyrinth.php
-#: includes/Admin/AdminDashboard.php:174
-#: includes/Admin/AdminDashboard.php:175
-#: includes/Admin/AdminDashboard.php:384
+#: includes/Admin/AdminDashboard.php:183
+#: includes/Admin/AdminDashboard.php:184
+#: includes/Admin/AdminDashboard.php:394
 msgid "Crawler Labyrinth"
 msgstr ""
 
@@ -46,292 +46,300 @@ msgstr ""
 msgid "Crawler Labyrinth requires PHP 8.2 or higher."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:205
+#: includes/Admin/AdminDashboard.php:214
 msgid "Crawler Labyrinth — Honeypot & Telemetry"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:220
+#: includes/Admin/AdminDashboard.php:229
 msgid "Crawler Labyrinth Active"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:220
+#: includes/Admin/AdminDashboard.php:229
 msgid "Crawler Labyrinth Paused"
 msgstr ""
 
 #. translators: 1: mode name, 2: route prefix
-#: includes/Admin/AdminDashboard.php:227
+#: includes/Admin/AdminDashboard.php:236
 #, php-format
 msgid "Mode: %1$s | Trap: /%2$s/"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:239
+#: includes/Admin/AdminDashboard.php:248
 msgid "Trap Hits"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:243
+#: includes/Admin/AdminDashboard.php:252
 msgid "Quarantined"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:250
+#: includes/Admin/AdminDashboard.php:259
 msgid "Open Crawler Labyrinth"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:342
+#: includes/Admin/AdminDashboard.php:352
 msgid "Telemetry & Audit"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:346
+#: includes/Admin/AdminDashboard.php:356
 msgid "Trap Settings"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:350
+#: includes/Admin/AdminDashboard.php:360
 msgid "Decoy & robots.txt Preview"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:354
+#: includes/Admin/AdminDashboard.php:364
 msgid "Privacy, REST & WP-CLI"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:370
+#: includes/Admin/AdminDashboard.php:380
 msgid "Labyrinth settings and retention schedule saved."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:372
+#: includes/Admin/AdminDashboard.php:382
 msgid "Data lifecycle preference saved."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:374
+#: includes/Admin/AdminDashboard.php:384
 msgid "Pseudonymizing retention and expired transient cleanup completed."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:385
+#: includes/Admin/AdminDashboard.php:395
 msgid "Local deterministic crawler tarpit &bull; RFC 9309 trap &bull; Keyed HMAC audit chain"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:392
+#: includes/Admin/AdminDashboard.php:402
 msgid "HMAC CHAIN VALID"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:392
+#: includes/Admin/AdminDashboard.php:402
 msgid "HMAC CHAIN WARNING"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:406
+#: includes/Admin/AdminDashboard.php:416
 msgid "Invalid or reserved trap route prefix reverted to \"crawler-trap\"."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:410
+#: includes/Admin/AdminDashboard.php:420
 msgid "Crawler Labyrinth Sections"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:420
+#: includes/Admin/AdminDashboard.php:430
 msgid "Telemetry Overview and Controls"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:423
+#: includes/Admin/AdminDashboard.php:433
 msgid "Honeypot Status"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:424
+#: includes/Admin/AdminDashboard.php:434
 msgid "Active"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:424
+#: includes/Admin/AdminDashboard.php:434
 msgid "Paused"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:428
+#: includes/Admin/AdminDashboard.php:438
 msgid "Decoy Pages Served"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:430
+#: includes/Admin/AdminDashboard.php:440
 msgid "100% local generation"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:433
+#: includes/Admin/AdminDashboard.php:443
 msgid "Quarantined Requests"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:438
+#: includes/Admin/AdminDashboard.php:448
 msgid "Unique IP Digests"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:440
+#: includes/Admin/AdminDashboard.php:450
 msgid "verified rows"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:445
+#: includes/Admin/AdminDashboard.php:455
 msgid "Recent Crawler Trap Activity"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:447
+#: includes/Admin/AdminDashboard.php:457
 msgid "No trap hits have been recorded yet."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:453
+#: includes/Admin/AdminDashboard.php:463
 msgid "ID"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:454
+#: includes/Admin/AdminDashboard.php:464
 msgid "Timestamp (UTC)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:455
+#: includes/Admin/AdminDashboard.php:465
 msgid "Action"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:456
+#: includes/Admin/AdminDashboard.php:466
 msgid "IP Digest"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:457
+#: includes/Admin/AdminDashboard.php:467
 msgid "Route Token"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:458
+#: includes/Admin/AdminDashboard.php:468
 msgid "User-Agent Excerpt"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:481
+#: includes/Admin/AdminDashboard.php:491
 msgid "Run Pseudonymizing Retention Now"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:487
+#: includes/Admin/AdminDashboard.php:497
 msgid "Data Lifecycle &amp; Uninstall"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:492
+#: includes/Admin/AdminDashboard.php:502
 msgid "Data Lifecycle Options"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:496
+#: includes/Admin/AdminDashboard.php:506
 msgid "Delete plugin options and audit log table on uninstall"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:496
+#: includes/Admin/AdminDashboard.php:506
 msgid "By default all settings and the HMAC-chained hit log survive plugin deletion."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:501
+#: includes/Admin/AdminDashboard.php:511
 msgid "Save Lifecycle Preference"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:510
+#: includes/Admin/AdminDashboard.php:520
 msgid "Crawler Labyrinth &amp; Quarantine Configuration"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:516
+#: includes/Admin/AdminDashboard.php:526
 msgid "Activation &amp; Routing"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:520
+#: includes/Admin/AdminDashboard.php:530
 msgid "Enable Crawler Labyrinth honeypot and trap routing"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:526
+#: includes/Admin/AdminDashboard.php:536
 msgid "Inject Disallow rule across all RFC 9309 User-agent groups in robots.txt"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:532
+#: includes/Admin/AdminDashboard.php:542
 msgid "Opt-in: also trap known AI training scraper User-Agents (spares search and citation bots)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:536
+#: includes/Admin/AdminDashboard.php:546
 msgid "Trap Route Prefix"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:538
+#: includes/Admin/AdminDashboard.php:548
 msgid "Lowercase letters, numbers, and hyphens only (3-32 chars). Reserved WordPress paths fall back to crawler-trap."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:543
+#: includes/Admin/AdminDashboard.php:553
 msgid "Defense Mode &amp; Quarantine Limits"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:545
+#: includes/Admin/AdminDashboard.php:555
 msgid "Trap Mode"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:547
+#: includes/Admin/AdminDashboard.php:557
 msgid "Hybrid (serve decoy up to strike threshold, then quarantine)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:548
+#: includes/Admin/AdminDashboard.php:558
 msgid "Labyrinth Only (always serve bounded synthetic decoys)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:549
+#: includes/Admin/AdminDashboard.php:559
 msgid "Immediate Block (quarantine on first disallowed hit)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:553
+#: includes/Admin/AdminDashboard.php:560
+msgid "Observe Only (dry-run: serve decoys and log hits without quarantining)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:564
 msgid "Decoy Response Format"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:555
+#: includes/Admin/AdminDashboard.php:566
 msgid "Semantic HTML5 (interlinked archival folios)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:556
+#: includes/Admin/AdminDashboard.php:567
 msgid "Plain Text (minimal bandwidth)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:561
+#: includes/Admin/AdminDashboard.php:572
 msgid "Footer Bait Links per Page (1-5)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:565
+#: includes/Admin/AdminDashboard.php:576
 msgid "Max Labyrinth Ring Depth (1-16)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:569
+#: includes/Admin/AdminDashboard.php:580
 msgid "Hybrid Strike Threshold (1-100)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:573
+#: includes/Admin/AdminDashboard.php:584
 msgid "Quarantine TTL in Minutes (5-10080)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:577
+#: includes/Admin/AdminDashboard.php:588
 msgid "Quarantine HTTP Status Code"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:579
+#: includes/Admin/AdminDashboard.php:590
 msgid "429 Too Many Requests (with Retry-After)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:580
+#: includes/Admin/AdminDashboard.php:591
 msgid "403 Forbidden"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:584
+#: includes/Admin/AdminDashboard.php:595
 msgid "User-Agent Retention Days (0 = keep, 1-365)"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:591
+#: includes/Admin/AdminDashboard.php:599
+msgid "Global Burst Limit per Minute (0 = unlimited, 5-10000)"
+msgstr ""
+
+#: includes/Admin/AdminDashboard.php:606
 msgid "Save Labyrinth Settings"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:614
+#: includes/Admin/AdminDashboard.php:629
 msgid "Sample Synthetic Archival Entry"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:618
+#: includes/Admin/AdminDashboard.php:633
 msgid "RFC 9309 robots.txt Group Injection Preview"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:626
+#: includes/Admin/AdminDashboard.php:641
 msgid "Privacy, REST API &amp; WP-CLI Reference"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:628
+#: includes/Admin/AdminDashboard.php:643
 msgid "All decoy generation is 100% local with zero outbound proxy calls. Visitor IP addresses are hashed with a daily rotating HMAC-SHA256 key and never stored in plaintext. Scheduled retention pseudonymizes User-Agent excerpts while preserving hash-chain verification."
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:630
+#: includes/Admin/AdminDashboard.php:645
 msgid "WP-CLI Commands"
 msgstr ""
 
-#: includes/Admin/AdminDashboard.php:635
+#: includes/Admin/AdminDashboard.php:650
 msgid "REST API Endpoints (manage_options required)"
 msgstr ""

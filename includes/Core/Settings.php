@@ -99,6 +99,7 @@ final class Settings {
 			'crawler_labyrinth_update_robots',
 			'crawler_labyrinth_intercept_training_ua',
 			'crawler_labyrinth_retention_days',
+			'crawler_labyrinth_burst_limit',
 			'crawler_labyrinth_delete_data_on_uninstall',
 			'crawler_labyrinth_hmac_secret',
 			'crawler_labyrinth_schema_version',
@@ -138,6 +139,7 @@ final class Settings {
 			'update_robots'         => '1' === (string) get_option( 'crawler_labyrinth_update_robots', '1' ),
 			'intercept_training_ua' => '1' === (string) get_option( 'crawler_labyrinth_intercept_training_ua', '0' ),
 			'retention_days'        => self::clamp_int( get_option( 'crawler_labyrinth_retention_days', 30 ), 0, 365, 30 ),
+			'burst_limit'           => self::sanitize_burst_limit( get_option( 'crawler_labyrinth_burst_limit', 120 ) ),
 			'delete_on_uninstall'   => '1' === (string) get_option( 'crawler_labyrinth_delete_data_on_uninstall', '0' ),
 		];
 	}
@@ -166,7 +168,24 @@ final class Settings {
 
 	public static function sanitize_mode( mixed $raw ): string {
 		$val = is_scalar( $raw ) ? strtolower( trim( (string) $raw ) ) : '';
-		return in_array( $val, [ 'hybrid', 'labyrinth', 'block' ], true ) ? $val : 'hybrid';
+		return in_array( $val, [ 'hybrid', 'labyrinth', 'block', 'observe' ], true ) ? $val : 'hybrid';
+	}
+
+	public static function sanitize_burst_limit( mixed $raw ): int {
+		if ( ! is_numeric( $raw ) ) {
+			return 120;
+		}
+		$val = (int) $raw;
+		if ( $val <= 0 ) {
+			return 0;
+		}
+		if ( $val < 5 ) {
+			return 5;
+		}
+		if ( $val > 10000 ) {
+			return 10000;
+		}
+		return $val;
 	}
 
 	public static function sanitize_format( mixed $raw ): string {

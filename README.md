@@ -20,6 +20,7 @@
 | **Author** | [Arnold Wender](https://arnoldwender.com) |
 | **Repository** | [github.com/arnoldwender/crawler-labyrinth](https://github.com/arnoldwender/crawler-labyrinth) |
 | **Companion Astro Package** | [arnoldwender/astro-crawler-labyrinth](https://github.com/arnoldwender/astro-crawler-labyrinth) |
+| **Companion JS Core (npm)** | [arnoldwender/crawler-labyrinth-js](https://github.com/arnoldwender/crawler-labyrinth-js) |
 | **Stack & Requirements** | WordPress 6.4+ · PHP 8.2+ · Pure PHP (no external proxy calls) |
 | **License** | [GPLv2 or later](LICENSE) |
 | **Built with an agentic workflow** | Developed with AI coding agents. Review and test it like any third-party code before you use it in production. |
@@ -46,10 +47,12 @@ Many crawler-tarpit snippets work by fetching and relaying third-party HTML from
 
 1. **RFC 9309 Multi-Group `robots.txt` Injection (`RobotsInjector`):** Injects `Disallow: /<prefix>/` into **every** `User-agent:` group (not only `User-agent: *`), preventing explicit `Allow: /` blocks for search or citation crawlers from shadowing the disallow rule.
 2. **Accessible-Inert Footer Bait (`BaitRenderer`):** Prints `<div hidden inert aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 links (`rel="nofollow noopener"`, `tabindex="-1"`, `aria-hidden="true"`) in `wp_footer` on unauthenticated public frontend responses only. Screen readers and keyboard tab order skip it automatically; logged-in users, feeds, previews, AJAX, and REST requests are excluded.
-3. **Bounded Labyrinth & Hybrid Quarantine (`TrapRouter`):**
-   - **`hybrid` (default):** Serves deterministic archival decoys (`200 OK` with `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noai, noimageai`) up to `crawler_labyrinth_strike_threshold` hits (default `5`), then quarantines the client IP digest with HTTP `429 Too Many Requests` (including `Retry-After`) or `403 Forbidden` for `crawler_labyrinth_block_ttl_minutes`.
+3. **Bounded Labyrinth, Dry-Run & Hybrid Quarantine (`TrapRouter`):**
+   - **`hybrid` (default):** Serves deterministic archival decoys (`200 OK` with `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noai, noimageai` and `X-Crawler-Labyrinth: decoy`) up to `crawler_labyrinth_strike_threshold` hits (default `5`), then quarantines the client IP digest with HTTP `429 Too Many Requests` (including `Retry-After`) or `403 Forbidden` (`X-Crawler-Labyrinth: quarantined`) for `crawler_labyrinth_block_ttl_minutes`.
    - **`labyrinth`:** Continues serving ring-bounded archival decoys indefinitely without quarantining.
    - **`block`:** Immediately quarantines on the first disallowed hit.
+   - **`observe`:** Dry-run audit mode — serves decoys and logs `'observed'` rows (`X-Crawler-Labyrinth: observed`) with `entry_vector` metadata without quarantining.
+   - **Pre-Query Interception & Burst Shedding:** Runs on `init` (priority `1`, skipping `is_admin()`) before `WP_Query`, and sheds flood spikes exceeding `crawler_labyrinth_burst_limit` per 60-second UTC window with HTTP `429` (`X-Crawler-Labyrinth: burst-shed`, `Retry-After: 60`) without writing per-IP transients or MySQL rows.
 4. **Search & Citation Crawler Protection:** Optional User-Agent enforcement (`crawler_labyrinth_intercept_training_ua`, disabled by default) explicitly exempts search, citation, and link-preview bots (`Googlebot`, `Bingbot`, `Applebot`, `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `MistralAI-User`, `Slackbot`, `Storebot-Google`, `DuckDuckBot`) before evaluating training scraper tokens (`GPTBot`, `CCBot`, `ClaudeBot`, `anthropic-ai`, `Bytespider`, `PetalBot`, `Diffbot`, `Omgilibot`, `ImagesiftBot`, `DataForSeoBot`, `Scrapy`).
 5. **Tamper-Evident Audit Chain & Pseudonymizing Retention (`HitLogger`):** Records hits in `{prefix}crawler_labyrinth_hits` using daily rotating keyed HMAC-SHA256 IP digests (raw IP addresses are never stored). Each row links to the previous `row_hash` (`prev_hash`). A daily WP-Cron job (`crawler_labyrinth_daily_purge`) redacts expired `user_agent_excerpt` values across batches, removes expired transients, and appends an advisory-locked (`GET_LOCK`) `retention_pseudonymized` residual hash record so keyset-paginated chain integrity (`verify_chain()`) remains verifiable.
 6. **Standalone Admin UI:** Ships a self-contained, token-based stylesheet (`assets/css/crawler-labyrinth-admin.css`) with zero external dependencies and a WordPress Dashboard telemetry widget.
@@ -103,7 +106,7 @@ Live `Telemetry & Audit` view displaying `HONEYPOT STATUS` (`Active`, `/crawler-
 | --- | --- | --- | --- |
 | `crawler_labyrinth_enabled` | `'1'` | `'1'` \| `'0'` | Global enable/pause switch |
 | `crawler_labyrinth_route_prefix` | `'crawler-trap'` | `3-32` chars `[a-z0-9-]` | Trap URL path segment (reserved WP paths blocked) |
-| `crawler_labyrinth_mode` | `'hybrid'` | `'hybrid'` \| `'labyrinth'` \| `'block'` | Decoy, block, or escalating strike mode |
+| `crawler_labyrinth_mode` | `'hybrid'` | `'hybrid'` \| `'labyrinth'` \| `'block'` \| `'observe'` | Decoy, block, dry-run observe, or escalating strike mode |
 | `crawler_labyrinth_response_format` | `'html'` | `'html'` \| `'plain'` | Archival HTML5 or plain-text response format |
 | `crawler_labyrinth_link_count` | `1` | `1..5` | Hidden depth-1 bait links rendered in `wp_footer` |
 | `crawler_labyrinth_max_depth` | `8` | `1..16` | Maximum traversal depth before wrapping back to depth `1` |
@@ -113,6 +116,7 @@ Live `Telemetry & Audit` view displaying `HONEYPOT STATUS` (`Active`, `/crawler-
 | `crawler_labyrinth_update_robots` | `'1'` | `'1'` \| `'0'` | Inject `Disallow: /<prefix>/` into `robots_txt` groups |
 | `crawler_labyrinth_intercept_training_ua` | `'0'` | `'1'` \| `'0'` | Opt-in interception of training scraper User-Agents |
 | `crawler_labyrinth_retention_days` | `30` | `0..365` | Days before `user_agent_excerpt` is redacted (`0` keeps) |
+| `crawler_labyrinth_burst_limit` | `120` | `0` (off) or `5..10000` | Global trap hits per 60 s UTC bucket before `429` burst shedding |
 | `crawler_labyrinth_delete_data_on_uninstall` | `'0'` | `'1'` \| `'0'` | Opt-in removal of options, transients, and audit table on uninstall |
 | `crawler_labyrinth_hmac_secret` | Auto-generated | 64-char hex | Persistent 256-bit key for tokens, digests, and hash chain |
 | `crawler_labyrinth_schema_version` | `'1.0.0'` | SemVer string | Internal database schema version marker |
