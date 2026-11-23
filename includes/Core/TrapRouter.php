@@ -40,7 +40,7 @@ final class TrapRouter {
 	];
 
 	public function boot(): void {
-		add_action( 'template_redirect', [ $this, 'intercept_request' ], 1 );
+		add_action( 'init', [ $this, 'intercept_request' ], 1 );
 	}
 
 	/**
@@ -54,6 +54,9 @@ final class TrapRouter {
 			return;
 		}
 		if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+			return;
+		}
+		if ( function_exists( 'is_admin' ) && is_admin() ) {
 			return;
 		}
 
@@ -156,13 +159,16 @@ final class TrapRouter {
 
 		$block_status = (int) $settings['block_status'];
 		$ttl_seconds  = (int) $settings['block_ttl_minutes'] * 60;
+		$mode         = (string) $settings['mode'];
 
 		// Check existing quarantine state first (including prior UTC days if TTL spans midnight).
-		$active_quarantine = $this->find_active_quarantine( $q_key, $client_ip, $secret, $ttl_seconds, $now );
-		if ( null !== $active_quarantine ) {
-			self::mark_uncacheable();
-			$retry_after = max( 60, $active_quarantine['until'] - $now );
-			return $this->build_block_response( $block_status, $retry_after, $active_quarantine['strikes'] );
+		if ( 'observe' !== $mode ) {
+			$active_quarantine = $this->find_active_quarantine( $q_key, $client_ip, $secret, $ttl_seconds, $now );
+			if ( null !== $active_quarantine ) {
+				self::mark_uncacheable();
+				$retry_after = max( 60, $active_quarantine['until'] - $now );
+				return $this->build_block_response( $block_status, $retry_after, $active_quarantine['strikes'] );
+			}
 		}
 
 		$ua_matched = ! $trap_matched && (bool) $settings['intercept_training_ua'] && Settings::is_training_only_ua( $user_agent );
@@ -174,12 +180,39 @@ final class TrapRouter {
 		self::mark_uncacheable();
 		$raw_token     = $trap_matched ? (string) ( $matches[1] ?? '' ) : 'ua-guard';
 		$token_for_log = '' !== $raw_token ? $raw_token : 'root';
-		$strikes       = ( function_exists( 'get_transient' ) ? (int) get_transient( $s_key ) : 0 ) + 1;
+
+		$burst_limit = (int) ( $settings['burst_limit'] ?? 120 );
+		if ( $burst_limit > 0 && $this->is_burst_exceeded( $burst_limit, $now ) ) {
+			if ( function_exists( 'do_action' ) ) {
+				do_action( 'crawler_labyrinth_trap_triggered', 'burst_shed', $token_for_log, 0, $ip_digest );
+			}
+			return $this->build_block_response( 429, 60, 0, 'burst-shed' );
+		}
+
+		$strikes = ( function_exists( 'get_transient' ) ? (int) get_transient( $s_key ) : 0 ) + 1;
 		if ( function_exists( 'set_transient' ) ) {
 			set_transient( $s_key, $strikes, max( 300, $ttl_seconds ) );
 		}
 
-		$mode       = (string) $settings['mode'];
+		$parsed = ( $trap_matched && '' !== $raw_token ) ? TokenSigner::verify( $raw_token, $secret ) : null;
+		if ( null !== $parsed && $parsed['depth'] > (int) $settings['max_depth'] ) {
+			$parsed = null;
+		}
+
+		if ( ! $trap_matched ) {
+			$entry_vector = 'ua_guard';
+		} elseif ( null !== $parsed ) {
+			$entry_vector = 'signed_bait';
+		} else {
+			$entry_vector = 'robots_probe';
+		}
+		$meta_json = (string) ( wp_json_encode(
+			[
+				'entry_vector' => $entry_vector,
+				'strikes'      => $strikes,
+			]
+		) ?: '{}' );
+
 		$threshold  = (int) $settings['strike_threshold'];
 		$quarantine = ( 'block' === $mode ) || ( 'hybrid' === $mode && $strikes > $threshold );
 
@@ -200,7 +233,7 @@ final class TrapRouter {
 			if ( $quarantine_until > $prev_max ) {
 				update_option( 'crawler_labyrinth_active_quarantine_max', $quarantine_until, true );
 			}
-			$logger->record( $ip_digest, $ua_digest, $user_agent, $token_for_log, 'quarantined' );
+			$logger->record( $ip_digest, $ua_digest, $user_agent, $token_for_log, 'quarantined', $meta_json );
 
 			if ( function_exists( 'do_action' ) ) {
 				do_action( 'crawler_labyrinth_trap_triggered', 'quarantined', $token_for_log, $strikes, $ip_digest );
@@ -209,10 +242,6 @@ final class TrapRouter {
 			return $this->build_block_response( $block_status, $ttl_seconds, $strikes );
 		}
 
-		$parsed = '' !== $raw_token ? TokenSigner::verify( $raw_token, $secret ) : null;
-		if ( null !== $parsed && $parsed['depth'] > (int) $settings['max_depth'] ) {
-			$parsed = null;
-		}
 		$depth = null !== $parsed ? $parsed['depth'] : 1;
 		$seed  = null !== $parsed
 			? $parsed['seed']
@@ -228,10 +257,14 @@ final class TrapRouter {
 			$secret
 		);
 
-		$logger->record( $ip_digest, $ua_digest, $user_agent, $token_for_log, 'decoy_served' );
+		$is_observe   = 'observe' === $mode;
+		$action_taken = $is_observe ? 'observed' : 'decoy_served';
+		$header_state = $is_observe ? 'observed' : 'decoy';
+
+		$logger->record( $ip_digest, $ua_digest, $user_agent, $token_for_log, $action_taken, $meta_json );
 
 		if ( function_exists( 'do_action' ) ) {
-			do_action( 'crawler_labyrinth_trap_triggered', 'decoy_served', $token_for_log, $strikes, $ip_digest );
+			do_action( 'crawler_labyrinth_trap_triggered', $action_taken, $token_for_log, $strikes, $ip_digest );
 		}
 
 		return [
@@ -242,11 +275,40 @@ final class TrapRouter {
 				'X-Robots-Tag'           => 'noindex, nofollow, noarchive, nosnippet, noai, noimageai',
 				'Cache-Control'          => 'no-store, no-cache, must-revalidate, private',
 				'X-Content-Type-Options' => 'nosniff',
+				'X-Crawler-Labyrinth'    => $header_state,
 			],
 			'body'    => $decoy['body'],
-			'action'  => 'decoy_served',
+			'action'  => $action_taken,
 			'strikes' => $strikes,
 		];
+	}
+
+	/**
+	 * Track global trap traffic per 60-second UTC bucket to shed flood load without touching MySQL.
+	 */
+	private function is_burst_exceeded( int $limit, int $now ): bool {
+		if ( ! function_exists( 'get_transient' ) || ! function_exists( 'set_transient' ) ) {
+			return false;
+		}
+		$bucket = intdiv( $now, 60 );
+		$raw    = get_transient( 'crawler_labyrinth_burst_win' );
+		$count  = ( is_array( $raw ) && (int) ( $raw['bucket'] ?? -1 ) === $bucket )
+			? (int) ( $raw['count'] ?? 0 )
+			: 0;
+
+		if ( $count >= $limit ) {
+			return true;
+		}
+
+		set_transient(
+			'crawler_labyrinth_burst_win',
+			[
+				'bucket' => $bucket,
+				'count'  => $count + 1,
+			],
+			120
+		);
+		return false;
 	}
 
 	/**
@@ -259,12 +321,13 @@ final class TrapRouter {
 	 *     strikes: int
 	 * }
 	 */
-	private function build_block_response( int $status, int $retry_after_seconds, int $strikes ): array {
+	private function build_block_response( int $status, int $retry_after_seconds, int $strikes, string $labyrinth_state = 'quarantined' ): array {
 		$headers = [
 			'Content-Type'           => 'text/plain; charset=utf-8',
 			'X-Robots-Tag'           => 'noindex, nofollow, noarchive, nosnippet, noai, noimageai',
 			'Cache-Control'          => 'no-store, no-cache, must-revalidate, private',
 			'X-Content-Type-Options' => 'nosniff',
+			'X-Crawler-Labyrinth'    => $labyrinth_state,
 		];
 		if ( 429 === $status ) {
 			$headers['Retry-After'] = (string) max( 60, $retry_after_seconds );
@@ -279,7 +342,7 @@ final class TrapRouter {
 			'status'  => $status,
 			'headers' => $headers,
 			'body'    => $message . "\n",
-			'action'  => 'quarantined',
+			'action'  => 'burst-shed' === $labyrinth_state ? 'burst_shed' : 'quarantined',
 			'strikes' => $strikes,
 		];
 	}

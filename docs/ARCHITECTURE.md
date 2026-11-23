@@ -1,6 +1,6 @@
 # Architecture — Crawler Labyrinth
 
-`crawler-labyrinth` · Version `1.0.3` · WordPress 6.4+ · PHP 8.2+ · Text Domain `crawler-labyrinth`
+`crawler-labyrinth` · Version `1.1.0` · WordPress 6.4+ · PHP 8.2+ · Text Domain `crawler-labyrinth`
 
 <p align="center">
   <img src="images/architecture-flow.svg" alt="Crawler Labyrinth WordPress runtime request routing and audit architecture" />
@@ -17,16 +17,17 @@ robots_txt (priority 999)
 wp_footer (priority 99, unauthenticated public HTML only)
   └─ BaitRenderer::render_footer_bait() emits <div hidden inert aria-hidden="true" data-crawler-labyrinth="1">
 
-template_redirect (priority 1)
+init (priority 1, skips is_admin(), WP-CLI, cron, AJAX, REST)
   └─ TrapRouter::handle_request()
        ├─ Exclusions: disabled | manage_options | non-matching subdir base | /wp-admin | /wp-login.php | /wp-json | /robots.txt | /.well-known | /sitemap | /feed
-       ├─ Quarantine transient hit (crawler_labyrinth_q_<ip_digest24>, with multi-day UTC lookback) -> DONOTCACHEPAGE + HTTP 429 (+ Retry-After) or 403
+       ├─ Unless mode == observe: active quarantine transient hit (crawler_labyrinth_q_<ip_digest24>, multi-day UTC lookback) -> DONOTCACHEPAGE + HTTP 429/403 (X-Crawler-Labyrinth: quarantined)
        ├─ Route prefix match OR opt-in training UA match (sparing ALLOWED_SEARCH_UA_TOKENS)
-       ├─ Increment strike transient (crawler_labyrinth_s_<ip_digest24>)
+       ├─ Global burst circuit breaker (crawler_labyrinth_burst_win per 60s bucket) -> HTTP 429 Retry-After: 60 (X-Crawler-Labyrinth: burst-shed, zero MySQL writes)
+       ├─ Increment strike transient (crawler_labyrinth_s_<ip_digest24>) + classify entry_vector (signed_bait | robots_probe | ua_guard)
        ├─ mode == block OR (mode == hybrid && strikes > strike_threshold)
-       │    └─ Persist quarantine transient, append advisory-locked 'quarantined' audit row, return 429/403
+       │    └─ Persist quarantine transient, append advisory-locked 'quarantined' audit row, return 429/403 (X-Crawler-Labyrinth: quarantined)
        └─ Else
-            └─ TokenSigner::verify() (depth <= max_depth) -> DecoyGenerator::generate(), append advisory-locked 'decoy_served' row, return 200 OK (empty body on HEAD)
+            └─ TokenSigner::verify() (depth <= max_depth) -> DecoyGenerator::generate(), append advisory-locked 'decoy_served' or 'observed' row, return 200 OK (X-Crawler-Labyrinth: decoy | observed)
 ```
 
 ---
@@ -61,8 +62,8 @@ Table: `{prefix}crawler_labyrinth_hits` (`InnoDB`)
 | `ua_digest` | `CHAR(64)` | Keyed HMAC-SHA256 digest of `User-Agent` |
 | `user_agent_excerpt` | `VARCHAR(191)` | Sanitized excerpt or `[REDACTED]` after retention |
 | `route_token` | `VARCHAR(128)` | Captured route token or `root` / `ua-guard` |
-| `action_taken` | `VARCHAR(32)` | `decoy_served`, `quarantined`, or `retention_pseudonymized` |
-| `meta_json` | `TEXT` | JSON metadata (stores `{"residuals": {...}}` for retention rows) |
+| `action_taken` | `VARCHAR(32)` | `decoy_served`, `quarantined`, `observed`, or `retention_pseudonymized` |
+| `meta_json` | `TEXT` | JSON metadata (`{"entry_vector": ..., "strikes": ...}` for hits, `{"residuals": {...}}` for retention rows) |
 | `prev_hash` | `CHAR(64)` | Previous row's `row_hash` (`000...` for row 1) |
 | `row_hash` | `CHAR(64)` | `v1` HMAC-SHA256 signature across row columns + `prev_hash` |
 

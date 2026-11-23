@@ -32,6 +32,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 		'crawler_labyrinth_update_robots',
 		'crawler_labyrinth_intercept_training_ua',
 		'crawler_labyrinth_retention_days',
+		'crawler_labyrinth_burst_limit',
 		'crawler_labyrinth_delete_data_on_uninstall',
 		'crawler_labyrinth_hmac_secret',
 		'crawler_labyrinth_schema_version',

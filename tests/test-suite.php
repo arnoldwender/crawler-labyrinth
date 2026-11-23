@@ -23,7 +23,7 @@ if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
 	define( 'HOUR_IN_SECONDS', 3600 );
 }
 if ( ! defined( 'CRAWLER_LABYRINTH_VERSION' ) ) {
-	define( 'CRAWLER_LABYRINTH_VERSION', '1.0.3' );
+	define( 'CRAWLER_LABYRINTH_VERSION', '1.1.0' );
 }
 if ( ! defined( 'CRAWLER_LABYRINTH_FILE' ) ) {
 	define( 'CRAWLER_LABYRINTH_FILE', dirname( __DIR__ ) . '/crawler-labyrinth.php' );
@@ -157,6 +157,9 @@ class Crawler_Labyrinth_Mock_WPDB {
 			}
 			if ( str_contains( $query, "action_taken = 'quarantined'" ) ) {
 				return count( array_filter( $this->rows, static fn( $r ): bool => 'quarantined' === $r->action_taken ) );
+			}
+			if ( str_contains( $query, "action_taken = 'observed'" ) ) {
+				return count( array_filter( $this->rows, static fn( $r ): bool => 'observed' === $r->action_taken ) );
 			}
 			return count( array_filter( $this->rows, static fn( $r ): bool => 'retention_pseudonymized' !== $r->action_taken ) );
 		}
@@ -1482,6 +1485,96 @@ assert_test(
 		&& str_contains( $unknown_tab_html, 'HMAC CHAIN VALID' )
 		&& str_contains( $unknown_tab_html, '1-ppost' )
 		&& str_contains( $unknown_tab_html, '<hr class="wp-header-end" aria-hidden="true" />' )
+);
+
+// Group 13: v1.1.0 Early init hook, observe mode, burst circuit breaker, entry_vector & X-Crawler-Labyrinth headers
+echo "\nGroup 13: v1.1.0 Pre-query init hook, observe dry-run, burst shedding, and entry_vector telemetry\n";
+
+$mock_actions = [];
+$router->boot();
+assert_test(
+	'TrapRouter::boot registers early init hook instead of template_redirect',
+	! empty( $mock_actions['init'] ) && empty( $mock_actions['template_redirect'] )
+);
+
+assert_test(
+	'Settings supports observe mode and clamps burst_limit bounds',
+	'observe' === Settings::sanitize_mode( 'observe' )
+		&& 0 === Settings::sanitize_burst_limit( 0 )
+		&& 0 === Settings::sanitize_burst_limit( -10 )
+		&& 5 === Settings::sanitize_burst_limit( 2 )
+		&& 10000 === Settings::sanitize_burst_limit( 25000 )
+		&& 120 === Settings::sanitize_burst_limit( 'abc' )
+);
+
+$wpdb->rows                            = [];
+$wpdb->insert_id                       = 0;
+$mock_transients                       = [];
+$mock_options['crawler_labyrinth_enabled']               = '1';
+$mock_options['crawler_labyrinth_route_prefix']          = 'crawler-trap';
+$mock_options['crawler_labyrinth_mode']                  = 'observe';
+$mock_options['crawler_labyrinth_strike_threshold']      = 2;
+$mock_options['crawler_labyrinth_intercept_training_ua'] = '1';
+$mock_options['crawler_labyrinth_burst_limit']           = 120;
+$signed_bait_token                                       = TokenSigner::sign( 1, 'archobs0001', $secret );
+$obs_bait                                                = $router->handle_request( '/crawler-trap/' . $signed_bait_token . '/', 'ObsBot/1.0', '198.51.100.40', false );
+$obs_probe                                               = $router->handle_request( '/crawler-trap/unsigned-probe/', 'ObsBot/1.0', '198.51.100.40', false );
+$obs_ua                                                  = $router->handle_request( '/ordinary-post/', 'GPTBot/1.2', '198.51.100.40', false );
+$obs_over_threshold                                      = $router->handle_request( '/crawler-trap/' . $signed_bait_token . '/', 'ObsBot/1.0', '198.51.100.40', false );
+$obs_stats                                               = $logger->get_stats();
+$obs_chain                                               = $logger->verify_chain();
+$meta1                                                   = json_decode( (string) ( $wpdb->rows[1]->meta_json ?? '{}' ), true );
+$meta2                                                   = json_decode( (string) ( $wpdb->rows[2]->meta_json ?? '{}' ), true );
+$meta3                                                   = json_decode( (string) ( $wpdb->rows[3]->meta_json ?? '{}' ), true );
+assert_test(
+	'observe mode logs observed hits past strike_threshold without quarantining, tags entry_vector, and sets X-Crawler-Labyrinth: observed',
+	200 === $obs_bait['status']
+		&& 200 === $obs_over_threshold['status']
+		&& 'observed' === $obs_over_threshold['action']
+		&& 'observed' === ( $obs_over_threshold['headers']['X-Crawler-Labyrinth'] ?? '' )
+		&& 4 === (int) $obs_stats['observed']
+		&& 0 === (int) $obs_stats['quarantined']
+		&& true === $obs_chain['valid']
+		&& 'signed_bait' === ( $meta1['entry_vector'] ?? '' )
+		&& 'robots_probe' === ( $meta2['entry_vector'] ?? '' )
+		&& 'ua_guard' === ( $meta3['entry_vector'] ?? '' ),
+	var_export( [ $obs_over_threshold['status'], $obs_stats, $meta1, $meta2, $meta3 ], true )
+);
+
+$mock_options['crawler_labyrinth_mode'] = 'hybrid';
+$decoy_hdr_res = $router->handle_request( '/crawler-trap/' . $signed_bait_token . '/', 'DecoyBot/1.0', '198.51.100.41', false );
+$mock_options['crawler_labyrinth_mode'] = 'block';
+$block_hdr_res = $router->handle_request( '/crawler-trap/' . $signed_bait_token . '/', 'BlockBot/1.0', '198.51.100.42', false );
+assert_test(
+	'TrapRouter emits X-Crawler-Labyrinth decoy and quarantined headers on standard responses',
+	'decoy' === ( $decoy_hdr_res['headers']['X-Crawler-Labyrinth'] ?? '' )
+		&& 'quarantined' === ( $block_hdr_res['headers']['X-Crawler-Labyrinth'] ?? '' )
+);
+
+// Burst circuit breaker sheds hit #6 cleanly without DB inserts or per-IP transient inflation
+$wpdb->rows                        = [];
+$wpdb->insert_id                   = 0;
+$mock_transients                   = [];
+$mock_options['crawler_labyrinth_mode']        = 'labyrinth';
+$mock_options['crawler_labyrinth_burst_limit'] = 5;
+for ( $bi = 1; $bi <= 5; $bi++ ) {
+	$router->handle_request( '/crawler-trap/' . $signed_bait_token . '/', 'BurstBot/' . $bi, '198.51.100.' . ( 50 + $bi ), false );
+}
+$rows_before_shed = count( $wpdb->rows );
+$shed_res         = $router->handle_request( '/crawler-trap/' . $signed_bait_token . '/', 'BurstBot/6', '198.51.100.56', false );
+$rows_after_shed  = count( $wpdb->rows );
+$mock_transients  = [];
+$mock_options['crawler_labyrinth_burst_limit'] = 120;
+assert_test(
+	'Global burst circuit breaker sheds excess trap requests with 429 burst-shed and zero MySQL inserts',
+	5 === $rows_before_shed
+		&& 5 === $rows_after_shed
+		&& true === $shed_res['handled']
+		&& 429 === $shed_res['status']
+		&& 'burst_shed' === $shed_res['action']
+		&& '60' === ( $shed_res['headers']['Retry-After'] ?? '' )
+		&& 'burst-shed' === ( $shed_res['headers']['X-Crawler-Labyrinth'] ?? '' )
+		&& ! isset( $mock_transients[ 'crawler_labyrinth_s_' . substr( TokenSigner::ip_digest( '198.51.100.56', gmdate( 'Y-m-d' ), $secret ), 0, 24 ) ] )
 );
 
 echo "\n==============================================================================\n";

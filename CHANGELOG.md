@@ -4,6 +4,18 @@ All notable changes to **Crawler Labyrinth** are documented in this file followi
 
 ---
 
+## [1.1.0] - 2026-11-23
+
+### Added
+- **Dry-Run `observe` Mode:** Serves deterministic decoys and records `'observed'` rows in `{prefix}crawler_labyrinth_hits` without emitting HTTP `429`/`403` quarantines, allowing administrators to audit crawler behavior before enabling active blocks.
+- **Global Burst Circuit Breaker (`crawler_labyrinth_burst_limit`):** Counts global trap requests per 60-second UTC window in a single transient (`crawler_labyrinth_burst_win`); once exceeded (default `120`/min, `0` disables), sheds flood requests immediately with HTTP `429` (`Retry-After: 60`, `X-Crawler-Labyrinth: burst-shed`) without touching MySQL or creating per-IP transients.
+- **Entry Vector Telemetry (`meta_json`):** Classifies each trapped request as `signed_bait`, `robots_probe`, or `ua_guard` alongside strike count inside `meta_json`.
+- **`X-Crawler-Labyrinth` Response Header:** Emits `decoy`, `quarantined`, `observed`, or `burst-shed` on handled responses so Nginx, Caddy, or reverse-proxy logs can react without storing plaintext IPs in WordPress.
+
+### Changed
+- **Pre-Query Request Interception:** Moved `TrapRouter::boot()` from `template_redirect` to `init` (priority `1`) with an explicit `is_admin()` guard so trapped requests short-circuit before WordPress executes `parse_request` and the main `WP_Query`.
+- Updated `HitLogger::get_stats()`, `AdminDashboard`, and `wp crawler-labyrinth status` to surface `observed` hits and `burst_limit`.
+
 ## [1.0.3] - 2026-11-23
 
 ### Changed

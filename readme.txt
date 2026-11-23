@@ -4,7 +4,7 @@ Tags: security, robots, honeypot, crawler, tarpit
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.0.3
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,7 +16,7 @@ Crawler Labyrinth defends WordPress sites against automated scrapers that ignore
 
 1. **RFC 9309 Multi-Group `robots.txt` Injection:** Automatically injects `Disallow: /<prefix>/` into every `User-agent:` group so explicit `Allow: /` rules for search or citation crawlers cannot shadow the disallow rule.
 2. **Accessible-Inert Footer Bait:** Prints `<div hidden inert aria-hidden="true" data-crawler-labyrinth="1">` with signed depth-1 trap links carrying `rel="nofollow noopener"`, `tabindex="-1"`, and `aria-hidden="true"` on unauthenticated public frontend pages only.
-3. **Deterministic Local Labyrinth & Hybrid Quarantine:** `DecoyGenerator` synthesizes archival cataloguing pages (`HTML5` or `text/plain`) using local HMAC-SHA256 derivation. In `hybrid` mode (default), scrapers receive bounded-depth decoy pages up to `crawler_labyrinth_strike_threshold` hits and are then quarantined with HTTP `429` (`Retry-After`) or `403` for `crawler_labyrinth_block_ttl_minutes`. Modes `labyrinth` and `block` are also available.
+3. **Deterministic Local Labyrinth, Dry-Run & Hybrid Quarantine:** `DecoyGenerator` synthesizes archival cataloguing pages (`HTML5` or `text/plain`) using local HMAC-SHA256 derivation. `TrapRouter` intercepts trapped requests early on `init` (priority `1`, skipping `is_admin()`) before `WP_Query` and sheds traffic floods exceeding `crawler_labyrinth_burst_limit` hits/minute with HTTP `429` (`X-Crawler-Labyrinth: burst-shed`). In `hybrid` mode (default), scrapers receive bounded-depth decoy pages up to `crawler_labyrinth_strike_threshold` hits and are then quarantined with HTTP `429` (`Retry-After`) or `403` for `crawler_labyrinth_block_ttl_minutes`. Modes `labyrinth`, `block`, and `observe` (dry-run audit logging) are also available.
 4. **Search & Citation Crawler Exemptions:** Optional opt-in training-UA interception (`crawler_labyrinth_intercept_training_ua`) is disabled by default and strictly exempts search, citation, and preview bots (`Googlebot`, `Bingbot`, `Applebot`, `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `MistralAI-User`, `Slackbot`, `Storebot-Google`, `DuckDuckBot`).
 5. **Tamper-Evident Audit Chain & Privacy:** Hits are logged to `{prefix}crawler_labyrinth_hits` using daily rotating keyed HMAC-SHA256 IP digests (raw IPs are never persisted) chained with `prev_hash` / `row_hash`. Scheduled daily retention redacts expired `user_agent_excerpt` fields while keeping chain verification intact.
 
@@ -53,6 +53,11 @@ No. This plugin is provided with zero support (`0` support). Private inquiries v
 3. Decoy & robots.txt Preview tab inspecting generated synthetic HTML5 entries and multi-group Disallow injection.
 
 == Changelog ==
+
+= 1.1.0 =
+* Early pre-query interception: switched `TrapRouter::boot()` from `template_redirect` to `init` (priority `1`) with an explicit `is_admin()` guard so trapped requests short-circuit before `WP_Query`.
+* Global burst circuit breaker: added `crawler_labyrinth_burst_limit` (default `120`/minute, `0` disables) using a single 60-second transient window (`crawler_labyrinth_burst_win`) to shed flood bursts with HTTP `429` (`Retry-After: 60`, `X-Crawler-Labyrinth: burst-shed`) without hitting MySQL.
+* Dry-run `observe` mode, `entry_vector` metadata (`signed_bait`, `robots_probe`, `ua_guard`), and `X-Crawler-Labyrinth` state headers (`decoy`, `quarantined`, `observed`, `burst-shed`) surfaced in Admin UI, `HitLogger::get_stats()`, and `wp crawler-labyrinth status`.
 
 = 1.0.3 =
 * Documentation only: README notes that the plugin was built with an agentic workflow, and SUPPORT.md states that logs, previews, audit chains and robots.txt output are not legal, security or compliance advice. No code changes.

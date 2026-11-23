@@ -527,7 +527,7 @@ final class HitLogger {
 	/**
 	 * Fetch summary metrics for admin telemetry, REST, and WP-CLI reporting.
 	 *
-	 * @return array{total_hits: int, decoy_served: int, quarantined: int, unique_ip_digests: int}
+	 * @return array{total_hits: int, decoy_served: int, quarantined: int, observed: int, unique_ip_digests: int}
 	 */
 	public function get_stats(): array {
 		global $wpdb;
@@ -535,6 +535,7 @@ final class HitLogger {
 			'total_hits'        => 0,
 			'decoy_served'      => 0,
 			'quarantined'       => 0,
+			'observed'          => 0,
 			'unique_ip_digests' => 0,
 		];
 		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
@@ -548,12 +549,15 @@ final class HitLogger {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- live summary counters.
 		$quarantined = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE action_taken = %s', $table, 'quarantined' ) );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- live summary counters.
+		$observed = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE action_taken = %s', $table, 'observed' ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- live summary counters.
 		$unique = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(DISTINCT ip_digest) FROM %i WHERE action_taken != %s', $table, self::RETENTION_ACTION ) );
 
 		return [
 			'total_hits'        => $total,
 			'decoy_served'      => $decoys,
 			'quarantined'       => $quarantined,
+			'observed'          => $observed,
 			'unique_ip_digests' => $unique,
 		];
 	}

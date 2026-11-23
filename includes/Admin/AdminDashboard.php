@@ -155,6 +155,15 @@ final class AdminDashboard {
 		);
 		register_setting(
 			'crawler_labyrinth_settings',
+			'crawler_labyrinth_burst_limit',
+			[
+				'type'              => 'integer',
+				'sanitize_callback' => [ Settings::class, 'sanitize_burst_limit' ],
+				'default'           => 120,
+			]
+		);
+		register_setting(
+			'crawler_labyrinth_settings',
 			'crawler_labyrinth_delete_data_on_uninstall',
 			[
 				'type'              => 'string',
@@ -298,6 +307,7 @@ final class AdminDashboard {
 			update_option( 'crawler_labyrinth_update_robots', isset( $_POST['crawler_labyrinth_update_robots'] ) ? '1' : '0' );
 			update_option( 'crawler_labyrinth_intercept_training_ua', isset( $_POST['crawler_labyrinth_intercept_training_ua'] ) ? '1' : '0' );
 			update_option( 'crawler_labyrinth_retention_days', Settings::clamp_int( isset( $_POST['crawler_labyrinth_retention_days'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_retention_days'] ) ) : '30', 0, 365, 30 ) );
+			update_option( 'crawler_labyrinth_burst_limit', Settings::sanitize_burst_limit( isset( $_POST['crawler_labyrinth_burst_limit'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['crawler_labyrinth_burst_limit'] ) ) : '120' ) );
 			Activator::sync_schedule();
 		} elseif ( 'lifecycle' === $form ) {
 			$redirect_tab = 'telemetry';
@@ -547,6 +557,7 @@ final class AdminDashboard {
 									<option value="hybrid" <?php selected( (string) $settings['mode'], 'hybrid' ); ?>><?php esc_html_e( 'Hybrid (serve decoy up to strike threshold, then quarantine)', 'crawler-labyrinth' ); ?></option>
 									<option value="labyrinth" <?php selected( (string) $settings['mode'], 'labyrinth' ); ?>><?php esc_html_e( 'Labyrinth Only (always serve bounded synthetic decoys)', 'crawler-labyrinth' ); ?></option>
 									<option value="block" <?php selected( (string) $settings['mode'], 'block' ); ?>><?php esc_html_e( 'Immediate Block (quarantine on first disallowed hit)', 'crawler-labyrinth' ); ?></option>
+									<option value="observe" <?php selected( (string) $settings['mode'], 'observe' ); ?>><?php esc_html_e( 'Observe Only (dry-run: serve decoys and log hits without quarantining)', 'crawler-labyrinth' ); ?></option>
 								</select>
 							</div>
 							<div class="cl-form-group">
@@ -583,6 +594,10 @@ final class AdminDashboard {
 								<div class="cl-form-group">
 									<label for="cl-retention"><?php esc_html_e( 'User-Agent Retention Days (0 = keep, 1-365)', 'crawler-labyrinth' ); ?></label>
 									<input type="number" min="0" max="365" id="cl-retention" name="crawler_labyrinth_retention_days" class="cl-input" value="<?php echo esc_attr( (string) $settings['retention_days'] ); ?>" />
+								</div>
+								<div class="cl-form-group">
+									<label for="cl-burst-limit"><?php esc_html_e( 'Global Burst Limit per Minute (0 = unlimited, 5-10000)', 'crawler-labyrinth' ); ?></label>
+									<input type="number" min="0" max="10000" id="cl-burst-limit" name="crawler_labyrinth_burst_limit" class="cl-input" value="<?php echo esc_attr( (string) $settings['burst_limit'] ); ?>" />
 								</div>
 							</div>
 						</fieldset>
