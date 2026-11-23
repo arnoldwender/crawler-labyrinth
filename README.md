@@ -22,6 +22,7 @@
 | **Companion Astro Package** | [arnoldwender/astro-crawler-labyrinth](https://github.com/arnoldwender/astro-crawler-labyrinth) |
 | **Stack & Requirements** | WordPress 6.4+ · PHP 8.2+ · Pure PHP (no external proxy calls) |
 | **License** | [GPLv2 or later](LICENSE) |
+| **Built with an agentic workflow** | Developed with AI coding agents. Review and test it like any third-party code before you use it in production. |
 | **Support & Liability** | **Zero support** — reproducible bugs on [GitHub Issues](https://github.com/arnoldwender/crawler-labyrinth/issues) only · **no private support** · **AS IS / no liability** ([SUPPORT.md](SUPPORT.md)) |
 | **Local Verification** | `php tests/test-suite.php && php tests/test-css-tokens.php && bash tests/run-mutations.sh` |
 
