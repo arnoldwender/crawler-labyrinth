@@ -149,20 +149,28 @@ final class TrapRouter {
 			return $passthrough;
 		}
 
+		$mode       = (string) $settings['mode'];
+		$ua_matched = ! $trap_matched && (bool) $settings['intercept_training_ua'] && Settings::is_training_only_ua( $user_agent );
+		$now        = time();
+
+		$has_active_bans = 'observe' !== $mode
+			&& ( ! function_exists( 'get_option' ) || (int) get_option( 'crawler_labyrinth_active_quarantine_max', 0 ) > $now );
+
+		if ( ! $trap_matched && ! $ua_matched && ! $has_active_bans ) {
+			return $passthrough;
+		}
+
 		$secret    = TokenSigner::ensure_secret();
-		$now       = time();
 		$utc_day   = gmdate( 'Y-m-d', $now );
 		$ip_digest = TokenSigner::ip_digest( $client_ip, $utc_day, $secret );
-		$ua_digest = TokenSigner::ua_digest( $user_agent, $secret );
 		$q_key     = 'crawler_labyrinth_q_' . substr( $ip_digest, 0, 24 );
 		$s_key     = 'crawler_labyrinth_s_' . substr( $ip_digest, 0, 24 );
 
 		$block_status = (int) $settings['block_status'];
 		$ttl_seconds  = (int) $settings['block_ttl_minutes'] * 60;
-		$mode         = (string) $settings['mode'];
 
 		// Check existing quarantine state first (including prior UTC days if TTL spans midnight).
-		if ( 'observe' !== $mode ) {
+		if ( $has_active_bans ) {
 			$active_quarantine = $this->find_active_quarantine( $q_key, $client_ip, $secret, $ttl_seconds, $now );
 			if ( null !== $active_quarantine ) {
 				self::mark_uncacheable();
@@ -171,13 +179,12 @@ final class TrapRouter {
 			}
 		}
 
-		$ua_matched = ! $trap_matched && (bool) $settings['intercept_training_ua'] && Settings::is_training_only_ua( $user_agent );
-
 		if ( ! $trap_matched && ! $ua_matched ) {
 			return $passthrough;
 		}
 
 		self::mark_uncacheable();
+		$ua_digest     = TokenSigner::ua_digest( $user_agent, $secret );
 		$raw_token     = $trap_matched ? (string) ( $matches[1] ?? '' ) : 'ua-guard';
 		$token_for_log = '' !== $raw_token ? $raw_token : 'root';
 
@@ -430,14 +437,14 @@ final class TrapRouter {
 			return null;
 		}
 
+		$max_active = function_exists( 'get_option' ) ? (int) get_option( 'crawler_labyrinth_active_quarantine_max', 0 ) : ( $now + 1 );
+		if ( $max_active <= $now ) {
+			return null;
+		}
+
 		$record = $this->parse_quarantine_transient( get_transient( $today_q_key ) );
 		if ( null !== $record && $record['until'] > $now ) {
 			return $record;
-		}
-
-		$max_active = (int) get_option( 'crawler_labyrinth_active_quarantine_max', 0 );
-		if ( $max_active <= $now ) {
-			return null;
 		}
 
 		$lookback_days = min( 7, max( 1, (int) ceil( $ttl_seconds / 86400 ) ) );
