@@ -142,7 +142,7 @@ final class TrapRouter {
 		}
 
 		$prefix       = (string) $settings['route_prefix'];
-		$regex        = '#^/' . preg_quote( $prefix, '#' ) . '(?:/([a-zA-Z0-9_-]{1,96}))?/?$#i';
+		$regex        = '#^/' . preg_quote( $prefix, '#' ) . '(?:/(.*))?$#i';
 		$trap_matched = 1 === preg_match( $regex, $path, $matches );
 
 		if ( ! $trap_matched && self::is_excluded_path( $path ) ) {
@@ -184,8 +184,18 @@ final class TrapRouter {
 		}
 
 		self::mark_uncacheable();
-		$ua_digest     = TokenSigner::ua_digest( $user_agent, $secret );
-		$raw_token     = $trap_matched ? (string) ( $matches[1] ?? '' ) : 'ua-guard';
+		$ua_digest = TokenSigner::ua_digest( $user_agent, $secret );
+		if ( $trap_matched ) {
+			$trimmed_tail    = trim( (string) ( $matches[1] ?? '' ), '/' );
+			$is_valid_token  = '' !== $trimmed_tail && 1 === preg_match( '/^[a-zA-Z0-9_-]{1,96}$/', $trimmed_tail );
+			$token_candidate = $is_valid_token ? $trimmed_tail : '';
+			$raw_token       = '' === $trimmed_tail
+				? ''
+				: ( function_exists( 'mb_substr' ) ? mb_substr( $trimmed_tail, 0, 96, 'UTF-8' ) : substr( $trimmed_tail, 0, 96 ) );
+		} else {
+			$token_candidate = '';
+			$raw_token       = 'ua-guard';
+		}
 		$token_for_log = '' !== $raw_token ? $raw_token : 'root';
 
 		if ( 'observe' !== $mode ) {
@@ -203,7 +213,7 @@ final class TrapRouter {
 			set_transient( $s_key, $strikes, max( 300, $ttl_seconds ) );
 		}
 
-		$parsed = ( $trap_matched && '' !== $raw_token ) ? TokenSigner::verify( $raw_token, $secret ) : null;
+		$parsed = ( $trap_matched && '' !== $token_candidate ) ? TokenSigner::verify( $token_candidate, $secret ) : null;
 		if ( null !== $parsed && $parsed['depth'] > (int) $settings['max_depth'] ) {
 			$parsed = null;
 		}
