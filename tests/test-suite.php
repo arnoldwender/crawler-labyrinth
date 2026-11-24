@@ -275,9 +275,10 @@ if ( ! function_exists( 'dbDelta' ) ) {
 }
 if ( ! function_exists( 'add_action' ) ) {
 	function add_action( string $tag, callable $cb, int $priority = 10, int $args = 1 ): void {
-		unset( $priority, $args );
-		global $mock_actions;
-		$mock_actions[ $tag ][] = $cb;
+		unset( $args );
+		global $mock_actions, $mock_action_priorities;
+		$mock_actions[ $tag ][]           = $cb;
+		$mock_action_priorities[ $tag ][] = $priority;
 	}
 }
 if ( ! function_exists( 'add_filter' ) ) {
@@ -305,7 +306,8 @@ if ( ! function_exists( 'do_action' ) ) {
 }
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( string $option, mixed $default = false ): mixed {
-		global $mock_options, $mock_current_blog_id, $mock_blog_options, $mock_notoptions_poisoned;
+		global $mock_options, $mock_option_reads, $mock_current_blog_id, $mock_blog_options, $mock_notoptions_poisoned;
+		$mock_option_reads[ $option ] = ( $mock_option_reads[ $option ] ?? 0 ) + 1;
 		if ( ! empty( $mock_notoptions_poisoned ) && 'crawler_labyrinth_hmac_secret' === $option ) {
 			return $default;
 		}
@@ -415,7 +417,8 @@ if ( ! function_exists( 'restore_current_blog' ) ) {
 }
 if ( ! function_exists( 'get_transient' ) ) {
 	function get_transient( string $key ): mixed {
-		global $mock_transients;
+		global $mock_transients, $mock_transient_reads;
+		$mock_transient_reads++;
 		return $mock_transients[ $key ] ?? false;
 	}
 }
@@ -1575,6 +1578,111 @@ assert_test(
 		&& '60' === ( $shed_res['headers']['Retry-After'] ?? '' )
 		&& 'burst-shed' === ( $shed_res['headers']['X-Crawler-Labyrinth'] ?? '' )
 		&& ! isset( $mock_transients[ 'crawler_labyrinth_s_' . substr( TokenSigner::ip_digest( '198.51.100.56', gmdate( 'Y-m-d' ), $secret ), 0, 24 ) ] )
+);
+
+// Group 14: Hackaton R1 security, hot-path, RFC 9309, admin telemetry & intercept_request regressions
+echo "\nGroup 14: Hackaton R1 regressions and intercept_request wiring\n";
+
+$mock_actions           = [];
+$mock_action_priorities = [];
+$router->boot();
+$_SERVER['REQUEST_URI']     = '/about-us/';
+$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)';
+$_SERVER['REMOTE_ADDR']     = '198.51.100.70';
+$mock_is_admin              = false;
+$mock_user_caps             = [];
+$mock_options['crawler_labyrinth_enabled']               = '1';
+$mock_options['crawler_labyrinth_mode']                  = 'hybrid';
+$mock_options['crawler_labyrinth_route_prefix']          = 'crawler-trap';
+$mock_options['crawler_labyrinth_active_quarantine_max'] = 0;
+$mock_transient_reads                                    = 0;
+$mock_option_reads                                       = [];
+$router->intercept_request();
+$human_transient_reads = $mock_transient_reads;
+$human_secret_reads    = $mock_option_reads['crawler_labyrinth_hmac_secret'] ?? 0;
+
+$mock_options['crawler_labyrinth_mode']                  = 'observe';
+$mock_options['crawler_labyrinth_active_quarantine_max'] = time() + 3600;
+$mock_transient_reads                                    = 0;
+$obs_ban_digest                                          = TokenSigner::ip_digest( '198.51.100.71', gmdate( 'Y-m-d' ), $secret );
+$mock_transients[ 'crawler_labyrinth_q_' . substr( $obs_ban_digest, 0, 24 ) ] = [ 'until' => time() + 3600, 'strikes' => 4 ];
+$obs_human_bypass                                        = $router->handle_request( '/about-us/', 'Mozilla/5.0', '198.51.100.71', false );
+$obs_human_transient_reads                               = $mock_transient_reads;
+assert_test(
+	'boot() pins init priority 1, intercept_request() passes normal traffic safely, and hot-path executes 0 transient/secret reads when no active bans or observe mode',
+	1 === ( $mock_action_priorities['init'][0] ?? 0 )
+		&& 0 === $human_transient_reads
+		&& 0 === $human_secret_reads
+		&& false === $obs_human_bypass['handled']
+		&& 0 === $obs_human_transient_reads,
+	var_export( [ $mock_action_priorities, $human_transient_reads, $human_secret_reads, $obs_human_bypass['handled'], $obs_human_transient_reads ], true )
+);
+
+// WP-2 & WP-3: observe ignores burst shedding; multi-segment, .html, newline, and >96-char probe paths are captured
+$mock_transients                                 = [];
+$mock_options['crawler_labyrinth_mode']          = 'observe';
+$mock_options['crawler_labyrinth_burst_limit']   = 5;
+$mock_options['crawler_labyrinth_active_quarantine_max'] = 0;
+$obs_burst_ok = true;
+for ( $obi = 1; $obi <= 6; $obi++ ) {
+	$obi_res = $router->handle_request( '/crawler-trap/' . $signed_bait_token . '/', 'ObsBurst/' . $obi, '198.51.100.72', false );
+	if ( 200 !== $obi_res['status'] || 'observed' !== $obi_res['action'] ) {
+		$obs_burst_ok = false;
+	}
+}
+$r_multi_seg  = $router->handle_request( '/crawler-trap/level1/level2/', 'ProbeBot/1.0', '198.51.100.73', false );
+$r_html_probe = $router->handle_request( '/crawler-trap/index.html', 'ProbeBot/1.0', '198.51.100.73', false );
+$r_long_probe = $router->handle_request( '/crawler-trap/' . str_repeat( 'a', 97 ) . '/', 'ProbeBot/1.0', '198.51.100.73', false );
+$r_nl_probe   = $router->handle_request( '/crawler-trap/foo%0abar', 'ProbeBot/1.0', '198.51.100.73', false );
+$r_sib_path   = $router->handle_request( '/crawler-trap-blog/post', 'Mozilla/5.0', '198.51.100.73', false );
+$last_row_nl  = $wpdb->rows[ $wpdb->insert_id ] ?? null;
+$nl_meta      = json_decode( (string) ( $last_row_nl->meta_json ?? '{}' ), true );
+$mock_options['crawler_labyrinth_burst_limit'] = 120;
+assert_test(
+	'observe never returns 429 burst-shed and trapRegex captures multi-segment, .html, >96-char, and newline probes while sparing sibling prefixes',
+	$obs_burst_ok
+		&& true === $r_multi_seg['handled']
+		&& true === $r_html_probe['handled']
+		&& true === $r_long_probe['handled']
+		&& true === $r_nl_probe['handled']
+		&& false === $r_sib_path['handled']
+		&& 'robots_probe' === ( $nl_meta['entry_vector'] ?? '' )
+		&& 'foobar' === (string) ( $last_row_nl->route_token ?? '' )
+);
+
+// WP-4 & WP-6: RFC 9309 blank-line / Sitemap mid-group continuity + dotted/slashed route prefix rejection
+$robots_blank_group = RobotsInjector::inject( "User-agent: GPTBot\nAllow: /public/\n\nDisallow: /crawler-trap/\n", 'crawler-trap' );
+$robots_sitemap_mid = RobotsInjector::inject( "User-agent: GPTBot\nAllow: /public/\nSitemap: https://example.test/sitemap.xml\nDisallow: /crawler-trap/\n", 'crawler-trap' );
+$robots_empty_sep   = RobotsInjector::inject( "User-agent: BadBot\n\nSitemap: https://example.test/sitemap.xml\n\nUser-agent: *\nAllow: /\n", 'crawler-trap' );
+assert_test(
+	'RobotsInjector preserves group state across blank lines and mid-group Sitemap while honoring empty-group boundaries, and sanitize_route_prefix rejects dots/slashes',
+	1 === substr_count( $robots_blank_group, 'Disallow: /crawler-trap/' )
+		&& $robots_blank_group === RobotsInjector::inject( $robots_blank_group, 'crawler-trap' )
+		&& 1 === substr_count( $robots_sitemap_mid, 'Disallow: /crawler-trap/' )
+		&& 2 === substr_count( $robots_empty_sep, 'Disallow: /crawler-trap/' )
+		&& str_contains( $robots_empty_sep, "User-agent: BadBot\nDisallow: /crawler-trap/\n\nSitemap:" )
+		&& 'crawler-trap' === Settings::sanitize_route_prefix( 'robots.txt' )
+		&& 'crawler-trap' === Settings::sanitize_route_prefix( 'api/v1' )
+);
+
+// WP-5: AdminDashboard Telemetry & Widget surface Observed count and parsed entry_vector
+$_GET                       = [ 'page' => 'crawler-labyrinth', 'tab' => 'telemetry' ];
+$mock_user_caps['manage_options'] = true;
+$admin_dash                 = new \CrawlerLabyrinth\Admin\AdminDashboard();
+ob_start();
+$admin_dash->render_dashboard();
+$dash_telemetry_html        = (string) ob_get_clean();
+ob_start();
+$admin_dash->render_dashboard_widget();
+$dash_widget_html           = (string) ob_get_clean();
+$_GET                       = [];
+$mock_user_caps             = [];
+assert_test(
+	'AdminDashboard surfaces Observed (Dry-Run), widget Observed count, and entry_vector telemetry column',
+	str_contains( $dash_telemetry_html, 'Observed (Dry-Run)' )
+		&& str_contains( $dash_telemetry_html, 'Entry Vector' )
+		&& str_contains( $dash_telemetry_html, '<code>robots_probe</code>' )
+		&& str_contains( $dash_widget_html, 'Observed' )
 );
 
 echo "\n==============================================================================\n";

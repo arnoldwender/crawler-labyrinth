@@ -262,4 +262,58 @@ return [
 			[ 'includes/Core/Settings.php', "return in_array( \$val, [ 'hybrid', 'labyrinth', 'block', 'observe' ], true ) ? \$val : 'hybrid';", "return in_array( \$val, [ 'hybrid', 'labyrinth', 'block' ], true ) ? \$val : 'hybrid';" ],
 		],
 	],
+	[
+		'TrapRouter::boot uses default priority 10 instead of early priority 1 on init',
+		[
+			[ 'includes/Core/TrapRouter.php', "add_action( 'init', [ \$this, 'intercept_request' ], 1 );", "add_action( 'init', [ \$this, 'intercept_request' ], 10 );" ],
+		],
+	],
+	[
+		'TrapRouter drops hot-path early return before secret reads',
+		[
+			[ 'includes/Core/TrapRouter.php', "if ( ! \$trap_matched && ! \$ua_matched && ! \$has_active_bans ) {\n\t\t\treturn \$passthrough;\n\t\t}", "if ( false && ! \$trap_matched ) {\n\t\t\treturn \$passthrough;\n\t\t}" ],
+		],
+	],
+	[
+		'TrapRouter runs burst shedder even in observe dry-run mode',
+		[
+			[ 'includes/Core/TrapRouter.php', "if ( 'observe' !== \$mode ) {\n\t\t\t\$burst_limit = (int) ( \$settings['burst_limit'] ?? 120 );", "if ( true ) {\n\t\t\t\$burst_limit = (int) ( \$settings['burst_limit'] ?? 120 );" ],
+		],
+	],
+	[
+		'TrapRouter reverts trapRegex to single-segment blocking multi-segment and .html probes',
+		[
+			[ 'includes/Core/TrapRouter.php', "\$regex        = '#^/' . preg_quote( \$prefix, '#' ) . '(?:/(.*))?\$#is';", "\$regex        = '#^/' . preg_quote( \$prefix, '#' ) . '(?:/([a-zA-Z0-9_-]{1,96}))?/?\$#i';" ],
+		],
+	],
+	[
+		'TrapRouter omits X-Crawler-Labyrinth state header on decoy and observe responses',
+		[
+			[ 'includes/Core/TrapRouter.php', "'X-Crawler-Labyrinth'    => \$header_state,", "'X-Crawler-Labyrinth'    => 'disabled'," ],
+		],
+	],
+	[
+		'TrapRouter misclassifies unsigned robots probes as signed_bait',
+		[
+			[ 'includes/Core/TrapRouter.php', "\$entry_vector = 'robots_probe';", "\$entry_vector = 'signed_bait';" ],
+		],
+	],
+	[
+		'Settings::sanitize_route_prefix stops rejecting dots and internal slashes',
+		[
+			[ 'includes/Core/Settings.php', "if ( '' === \$trimmed || str_contains( \$trimmed, '.' ) || str_contains( \$trimmed, '/' ) ) {", "if ( '' === \$trimmed ) {" ],
+		],
+	],
+	[
+		'RobotsInjector flushes active group prematurely on Sitemap directive',
+		[
+			[ 'includes/Core/RobotsInjector.php', "if ( \$is_sitemap ) {\n\t\t\t\tif ( \$in_group ) {\n\t\t\t\t\t\$saw_blank = true;\n\t\t\t\t}\n\t\t\t\t\$result[] = \$line;\n\t\t\t\tcontinue;\n\t\t\t}", "if ( \$is_sitemap ) {\n\t\t\t\tif ( \$in_group && ! \$group_has_disallow ) {\n\t\t\t\t\t\$result = self::insert_before_trailing_blanks( \$result, \$rule );\n\t\t\t\t}\n\t\t\t\t\$in_group = false;\n\t\t\t\t\$result[] = \$line;\n\t\t\t\tcontinue;\n\t\t\t}" ],
+		],
+	],
+	[
+		'AdminDashboard drops entry_vector extraction from Telemetry table',
+		[
+			[ 'includes/Admin/AdminDashboard.php', "\$entry_vector = ( is_array( \$row_meta ) && isset( \$row_meta['entry_vector'] ) && is_string( \$row_meta['entry_vector'] ) )", "\$entry_vector = ( false && is_array( \$row_meta ) && isset( \$row_meta['entry_vector'] ) && is_string( \$row_meta['entry_vector'] ) )" ],
+		],
+	],
 ];
