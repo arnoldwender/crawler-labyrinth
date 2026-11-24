@@ -188,12 +188,14 @@ final class TrapRouter {
 		$raw_token     = $trap_matched ? (string) ( $matches[1] ?? '' ) : 'ua-guard';
 		$token_for_log = '' !== $raw_token ? $raw_token : 'root';
 
-		$burst_limit = (int) ( $settings['burst_limit'] ?? 120 );
-		if ( $burst_limit > 0 && $this->is_burst_exceeded( $burst_limit, $now ) ) {
-			if ( function_exists( 'do_action' ) ) {
-				do_action( 'crawler_labyrinth_trap_triggered', 'burst_shed', $token_for_log, 0, $ip_digest );
+		if ( 'observe' !== $mode ) {
+			$burst_limit = (int) ( $settings['burst_limit'] ?? 120 );
+			if ( $burst_limit > 0 && $this->is_burst_exceeded( $burst_limit, $now ) ) {
+				if ( function_exists( 'do_action' ) ) {
+					do_action( 'crawler_labyrinth_trap_triggered', 'burst_shed', $token_for_log, 0, $ip_digest );
+				}
+				return $this->build_block_response( 429, 60, 0, 'burst-shed' );
 			}
-			return $this->build_block_response( 429, 60, 0, 'burst-shed' );
 		}
 
 		$strikes = ( function_exists( 'get_transient' ) ? (int) get_transient( $s_key ) : 0 ) + 1;
