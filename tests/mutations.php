@@ -48,7 +48,7 @@ return [
 	[
 		'RobotsInjector skips injecting Disallow into existing User-agent groups',
 		[
-			[ 'includes/Core/RobotsInjector.php', 'if ( $in_group && $has_non_ua_directive && ! $group_has_disallow ) {', 'if ( false && $in_group && $has_non_ua_directive && ! $group_has_disallow ) {' ],
+			[ 'includes/Core/RobotsInjector.php', 'if ( $in_group && ( $has_non_ua_directive || $saw_blank ) && ! $group_has_disallow ) {', 'if ( false && $in_group && ( $has_non_ua_directive || $saw_blank ) && ! $group_has_disallow ) {' ],
 		],
 	],
 	[
