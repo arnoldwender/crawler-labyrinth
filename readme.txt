@@ -4,7 +4,7 @@ Tags: security, robots, honeypot, crawler, tarpit
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -53,6 +53,13 @@ No. This plugin is provided with zero support (`0` support). Private inquiries v
 3. Decoy & robots.txt Preview tab inspecting generated synthetic HTML5 entries and multi-group Disallow injection.
 
 == Changelog ==
+
+= 1.1.1 =
+* Hot-path optimization (`TrapRouter`): short-circuits normal human requests before secret reads, HMAC digests, or transient queries when no active quarantines exist (or in `observe` mode).
+* `observe` dry-run parity: skips HTTP `429 burst-shed` throttling during `observe` dry-run monitoring.
+* Extended trap path matching: captures multi-segment paths, `.html` suffixes, newline tails, and `>96`-character probes under `/<route_prefix>/...` as `robots_probe`.
+* RFC 9309 `robots.txt` continuity: keeps active `User-agent:` group state across blank lines and mid-group `Sitemap:` lines without duplicating `Disallow: /<prefix>/`.
+* Telemetry UI & validation: surfaces `Observed` counts and `entry_vector` in the Admin UI (`languages/crawler-labyrinth.pot` updated), rejects dots/slashes in `Settings::sanitize_route_prefix()`, and expands unit/mutation coverage.
 
 = 1.1.0 =
 * Early pre-query interception: switched `TrapRouter::boot()` from `template_redirect` to `init` (priority `1`) with an explicit `is_admin()` guard so trapped requests short-circuit before `WP_Query`.
