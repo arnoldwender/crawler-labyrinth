@@ -50,6 +50,7 @@ final class RobotsInjector {
 		$in_group             = false;
 		$has_non_ua_directive = false;
 		$group_has_disallow   = false;
+		$saw_blank            = false;
 		$found_any_ua         = false;
 
 		foreach ( $lines as $line ) {
@@ -62,41 +63,35 @@ final class RobotsInjector {
 
 			if ( $is_ua ) {
 				$found_any_ua = true;
-				if ( $in_group && $has_non_ua_directive && ! $group_has_disallow ) {
+				if ( $in_group && ( $has_non_ua_directive || $saw_blank ) && ! $group_has_disallow ) {
 					$result = self::insert_before_trailing_blanks( $result, $rule );
 				}
-				if ( ! $in_group || $has_non_ua_directive ) {
+				if ( ! $in_group || $has_non_ua_directive || $saw_blank ) {
 					$in_group             = true;
 					$has_non_ua_directive = false;
 					$group_has_disallow   = false;
+					$saw_blank            = false;
 				}
 				$result[] = $line;
 				continue;
 			}
 
 			if ( $is_sitemap ) {
-				if ( $in_group && ! $group_has_disallow ) {
-					$result = self::insert_before_trailing_blanks( $result, $rule );
+				if ( $in_group ) {
+					$saw_blank = true;
 				}
-				$in_group             = false;
-				$has_non_ua_directive = false;
-				$group_has_disallow   = false;
-				$result[]             = $line;
+				$result[] = $line;
 				continue;
 			}
 
 			if ( $in_group && $is_directive ) {
 				$has_non_ua_directive = true;
+				$saw_blank            = false;
 				if ( self::normalize_rule_compare( $no_comment ) === self::normalize_rule_compare( $rule ) ) {
 					$group_has_disallow = true;
 				}
 			} elseif ( $in_group && $is_blank ) {
-				if ( ! $group_has_disallow ) {
-					$result = self::insert_before_trailing_blanks( $result, $rule );
-				}
-				$in_group             = false;
-				$has_non_ua_directive = false;
-				$group_has_disallow   = false;
+				$saw_blank = true;
 			}
 
 			$result[] = $line;
@@ -121,8 +116,10 @@ final class RobotsInjector {
 	private static function insert_before_trailing_blanks( array $lines, string $rule ): array {
 		$trailing = [];
 		while ( [] !== $lines ) {
-			$last = $lines[ count( $lines ) - 1 ];
-			if ( '' !== trim( $last ) && ! str_starts_with( trim( $last ), '#' ) ) {
+			$last      = $lines[ count( $lines ) - 1 ];
+			$last_trim = trim( $last );
+			$is_meta   = '' === $last_trim || str_starts_with( $last_trim, '#' ) || 1 === preg_match( '/^sitemap\s*:/i', $last_trim );
+			if ( ! $is_meta ) {
 				break;
 			}
 			array_unshift( $trailing, (string) array_pop( $lines ) );
