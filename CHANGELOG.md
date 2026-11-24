@@ -4,6 +4,18 @@ All notable changes to **Crawler Labyrinth** are documented in this file followi
 
 ---
 
+## [1.1.1] - 2026-11-24
+
+### Fixed
+- **Zero-Overhead Hot-Path Short-Circuit (`TrapRouter`):** Checks `crawler_labyrinth_active_quarantine_max` (`> $now`) and defers `TokenSigner::ensure_secret()`, IP/UA HMAC digests, and `get_transient()` lookups when zero active bans exist (or in `observe` mode).
+- **Dry-Run `observe` Contract Parity:** Skips HTTP `429 burst-shed` responses in `mode === 'observe'`.
+- **Extended Trap Probe Matching (`TrapRouter`):** Captures multi-segment paths, `.html` suffixes, newline probe tails (`#is`), and `>96`-char tokens under `/<route_prefix>/...` while stripping control bytes and classifying unsigned probes as `robots_probe`.
+- **RFC 9309 `robots.txt` Group Continuity (`RobotsInjector`):** Preserves active `User-agent:` group state across blank lines and mid-group `Sitemap:` directives so existing `Disallow: /<prefix>/` rules are never duplicated, while still flushing empty `User-agent:` blocks cleanly.
+- **Route Prefix Sanitization Parity (`Settings`):** Rejects dots and internal slashes before stripping in `Settings::sanitize_route_prefix()` (e.g. `robots.txt`, `api/v1`).
+
+### Added
+- **Admin Telemetry UI & Test Coverage (`AdminDashboard`, tests):** Surfaces `Observed` KPI counters in the dashboard widget and Telemetry overview, displays parsed `entry_vector` values in the activity table, regenerates `languages/crawler-labyrinth.pot`, and expands regression tests (`63 PASSED`) and mutation suites (`51/51 RED`).
+
 ## [1.1.0] - 2026-11-23
 
 ### Added

@@ -23,7 +23,7 @@ if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
 	define( 'HOUR_IN_SECONDS', 3600 );
 }
 if ( ! defined( 'CRAWLER_LABYRINTH_VERSION' ) ) {
-	define( 'CRAWLER_LABYRINTH_VERSION', '1.1.0' );
+	define( 'CRAWLER_LABYRINTH_VERSION', '1.1.1' );
 }
 if ( ! defined( 'CRAWLER_LABYRINTH_FILE' ) ) {
 	define( 'CRAWLER_LABYRINTH_FILE', dirname( __DIR__ ) . '/crawler-labyrinth.php' );
