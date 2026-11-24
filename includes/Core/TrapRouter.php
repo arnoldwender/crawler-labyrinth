@@ -142,7 +142,7 @@ final class TrapRouter {
 		}
 
 		$prefix       = (string) $settings['route_prefix'];
-		$regex        = '#^/' . preg_quote( $prefix, '#' ) . '(?:/(.*))?$#i';
+		$regex        = '#^/' . preg_quote( $prefix, '#' ) . '(?:/(.*))?$#is';
 		$trap_matched = 1 === preg_match( $regex, $path, $matches );
 
 		if ( ! $trap_matched && self::is_excluded_path( $path ) ) {
@@ -189,9 +189,12 @@ final class TrapRouter {
 			$trimmed_tail    = trim( (string) ( $matches[1] ?? '' ), '/' );
 			$is_valid_token  = '' !== $trimmed_tail && 1 === preg_match( '/^[a-zA-Z0-9_-]{1,96}$/', $trimmed_tail );
 			$token_candidate = $is_valid_token ? $trimmed_tail : '';
+			$clean_tail      = (string) preg_replace( '/[\x00-\x1F\x7F]+/', '', $trimmed_tail );
 			$raw_token       = '' === $trimmed_tail
 				? ''
-				: ( function_exists( 'mb_substr' ) ? mb_substr( $trimmed_tail, 0, 96, 'UTF-8' ) : substr( $trimmed_tail, 0, 96 ) );
+				: ( '' === $clean_tail
+					? 'control-probe'
+					: ( function_exists( 'mb_substr' ) ? mb_substr( $clean_tail, 0, 96, 'UTF-8' ) : substr( $clean_tail, 0, 96 ) ) );
 		} else {
 			$token_candidate = '';
 			$raw_token       = 'ua-guard';
