@@ -249,6 +249,14 @@ final class AdminDashboard {
 					<span class="cl-stat-value is-info"><?php echo esc_html( (string) $stats['total_hits'] ); ?></span>
 				</div>
 				<div class="cl-widget-kpi">
+					<span class="cl-stat-label"><?php esc_html_e( 'Decoys', 'crawler-labyrinth' ); ?></span>
+					<span class="cl-stat-value is-ok"><?php echo esc_html( (string) $stats['decoy_served'] ); ?></span>
+				</div>
+				<div class="cl-widget-kpi">
+					<span class="cl-stat-label"><?php esc_html_e( 'Observed', 'crawler-labyrinth' ); ?></span>
+					<span class="cl-stat-value is-info"><?php echo esc_html( (string) ( (int) ( $stats['observed'] ?? 0 ) ) ); ?></span>
+				</div>
+				<div class="cl-widget-kpi">
 					<span class="cl-stat-label"><?php esc_html_e( 'Quarantined', 'crawler-labyrinth' ); ?></span>
 					<span class="cl-stat-value is-warn"><?php echo esc_html( (string) $stats['quarantined'] ); ?></span>
 				</div>
@@ -440,6 +448,11 @@ final class AdminDashboard {
 						<span class="cl-stat-meta"><?php esc_html_e( '100% local generation', 'crawler-labyrinth' ); ?></span>
 					</div>
 					<div class="cl-stat-card">
+						<span class="cl-stat-label"><?php esc_html_e( 'Observed (Dry-Run)', 'crawler-labyrinth' ); ?></span>
+						<span class="cl-stat-value is-info"><?php echo esc_html( (string) ( (int) ( $stats['observed'] ?? 0 ) ) ); ?></span>
+						<span class="cl-stat-meta"><?php esc_html_e( 'Observe mode hits', 'crawler-labyrinth' ); ?></span>
+					</div>
+					<div class="cl-stat-card">
 						<span class="cl-stat-label"><?php esc_html_e( 'Quarantined Requests', 'crawler-labyrinth' ); ?></span>
 						<span class="cl-stat-value is-warn"><?php echo esc_html( (string) $stats['quarantined'] ); ?></span>
 						<span class="cl-stat-meta"><?php echo esc_html( 'HTTP ' . (string) $settings['block_status'] ); ?></span>
@@ -463,17 +476,25 @@ final class AdminDashboard {
 									<th scope="col"><?php esc_html_e( 'ID', 'crawler-labyrinth' ); ?></th>
 									<th scope="col"><?php esc_html_e( 'Timestamp (UTC)', 'crawler-labyrinth' ); ?></th>
 									<th scope="col"><?php esc_html_e( 'Action', 'crawler-labyrinth' ); ?></th>
+									<th scope="col"><?php esc_html_e( 'Entry Vector', 'crawler-labyrinth' ); ?></th>
 									<th scope="col"><?php esc_html_e( 'IP Digest', 'crawler-labyrinth' ); ?></th>
 									<th scope="col"><?php esc_html_e( 'Route Token', 'crawler-labyrinth' ); ?></th>
 									<th scope="col"><?php esc_html_e( 'User-Agent Excerpt', 'crawler-labyrinth' ); ?></th>
 								</tr>
 							</thead>
 							<tbody>
-								<?php foreach ( $recent_rows as $row ) : ?>
+								<?php
+								foreach ( $recent_rows as $row ) :
+									$row_meta     = json_decode( (string) ( $row->meta_json ?? '{}' ), true );
+									$entry_vector = ( is_array( $row_meta ) && isset( $row_meta['entry_vector'] ) && is_string( $row_meta['entry_vector'] ) )
+										? $row_meta['entry_vector']
+										: '';
+									?>
 								<tr>
 									<td><?php echo esc_html( (string) ( $row->id ?? '' ) ); ?></td>
 									<td><?php echo esc_html( (string) ( $row->created_at ?? '' ) ); ?></td>
 									<td><?php echo esc_html( (string) ( $row->action_taken ?? '' ) ); ?></td>
+									<td><?php echo '' !== $entry_vector ? '<code>' . esc_html( $entry_vector ) . '</code>' : '&mdash;'; ?></td>
 									<td><code><?php echo esc_html( substr( (string) ( $row->ip_digest ?? '' ), 0, 16 ) . '...' ); ?></code></td>
 									<td><code><?php echo esc_html( (string) ( $row->route_token ?? '' ) ); ?></code></td>
 									<td><?php echo esc_html( (string) ( $row->user_agent_excerpt ?? '' ) ); ?></td>
