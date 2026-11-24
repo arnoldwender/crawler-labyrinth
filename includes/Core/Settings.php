@@ -152,8 +152,11 @@ final class Settings {
 		if ( ! is_scalar( $raw ) ) {
 			return self::DEFAULT_ROUTE_PREFIX;
 		}
-		$clean = strtolower( trim( (string) $raw, " \t\n\r\0\x0B/" ) );
-		$clean = (string) preg_replace( '/[^a-z0-9-]/', '', $clean );
+		$trimmed = strtolower( trim( (string) $raw, " \t\n\r\0\x0B/" ) );
+		if ( '' === $trimmed || str_contains( $trimmed, '.' ) || str_contains( $trimmed, '/' ) ) {
+			return self::DEFAULT_ROUTE_PREFIX;
+		}
+		$clean = (string) preg_replace( '/[^a-z0-9-]/', '', $trimmed );
 		$clean = trim( $clean, '-' );
 		if ( strlen( $clean ) < 3 || strlen( $clean ) > 32 ) {
 			return self::DEFAULT_ROUTE_PREFIX;
